@@ -1,0 +1,586 @@
+/**
+ * Smart Div Injector - Admin Styles
+ * Version: 2.0.0
+ * Author: DWAY SRL
+ * Author URI: https://dway.agency
+ */
+
+/* ========================================
+   Variables & General
+   ======================================== */
+:root {
+    --sdi-primary: #2271b1;
+    --sdi-primary-dark: #135e96;
+    --sdi-success: #00a32a;
+    --sdi-warning: #dba617;
+    --sdi-danger: #d63638;
+    --sdi-gray-100: #f9fafb;
+    --sdi-gray-200: #f0f0f1;
+    --sdi-gray-300: #dcdcde;
+    --sdi-gray-400: #c3c4c7;
+    --sdi-gray-500: #8c8f94;
+    --sdi-gray-700: #50575e;
+    --sdi-gray-900: #1d2327;
+    --sdi-border-radius: 4px;
+    --sdi-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+    --sdi-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --sdi-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* ========================================
+   Header & Title
+   ======================================== */
+.sdi-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--sdi-gray-200);
+}
+
+.sdi-header h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--sdi-gray-900);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sdi-header h1 .dashicons {
+    color: var(--sdi-primary);
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
+}
+
+.sdi-add-button {
+    background: var(--sdi-primary) !important;
+    border-color: var(--sdi-primary) !important;
+    color: white !important;
+    padding: 8px 16px !important;
+    font-weight: 500 !important;
+    box-shadow: var(--sdi-shadow-sm) !important;
+    transition: all 0.2s ease !important;
+}
+
+.sdi-add-button:hover {
+    background: var(--sdi-primary-dark) !important;
+    border-color: var(--sdi-primary-dark) !important;
+    box-shadow: var(--sdi-shadow) !important;
+    transform: translateY(-1px);
+}
+
+.sdi-add-button .dashicons {
+    margin-top: 3px;
+}
+
+/* ========================================
+   Empty State
+   ======================================== */
+.sdi-empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    background: white;
+    border: 2px dashed var(--sdi-gray-300);
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.sdi-empty-state .dashicons {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    color: var(--sdi-gray-400);
+    margin-bottom: 20px;
+}
+
+.sdi-empty-state h3 {
+    font-size: 20px;
+    color: var(--sdi-gray-700);
+    margin-bottom: 10px;
+}
+
+.sdi-empty-state p {
+    font-size: 14px;
+    color: var(--sdi-gray-500);
+    margin-bottom: 20px;
+}
+
+/* ========================================
+   Rules Table
+   ======================================== */
+.sdi-rules-table {
+    background: white;
+    border: 1px solid var(--sdi-gray-300);
+    border-radius: var(--sdi-border-radius);
+    box-shadow: var(--sdi-shadow-sm);
+    margin-top: 20px;
+}
+
+.sdi-rules-table thead th {
+    background: var(--sdi-gray-100);
+    font-weight: 600;
+    color: var(--sdi-gray-700);
+    padding: 12px 16px !important;
+    border-bottom: 2px solid var(--sdi-gray-300);
+}
+
+.sdi-rules-table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.sdi-rules-table tbody tr:hover {
+    background: var(--sdi-gray-100);
+}
+
+.sdi-rules-table tbody td {
+    padding: 14px 16px !important;
+    vertical-align: middle !important;
+}
+
+/* ========================================
+   Status Badge
+   ======================================== */
+.sdi-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.sdi-status-badge.active {
+    background: #e7f7ed;
+    color: var(--sdi-success);
+}
+
+.sdi-status-badge.inactive {
+    background: var(--sdi-gray-200);
+    color: var(--sdi-gray-500);
+}
+
+.sdi-status-badge .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+/* ========================================
+   Type Badge
+   ======================================== */
+.sdi-type-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: var(--sdi-border-radius);
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--sdi-gray-100);
+    color: var(--sdi-gray-700);
+    border: 1px solid var(--sdi-gray-300);
+}
+
+/* ========================================
+   Target Info
+   ======================================== */
+.sdi-target-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--sdi-gray-700);
+}
+
+.sdi-target-info .dashicons {
+    color: var(--sdi-primary);
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+
+/* ========================================
+   Code Display
+   ======================================== */
+.sdi-code {
+    font-family: 'Courier New', Courier, monospace;
+    background: var(--sdi-gray-100);
+    padding: 3px 8px;
+    border-radius: var(--sdi-border-radius);
+    font-size: 13px;
+    color: var(--sdi-primary-dark);
+    border: 1px solid var(--sdi-gray-300);
+}
+
+/* ========================================
+   Action Buttons
+   ======================================== */
+.sdi-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.sdi-btn-edit,
+.sdi-btn-duplicate,
+.sdi-btn-delete {
+    font-size: 13px !important;
+    padding: 6px 12px !important;
+    height: auto !important;
+    transition: all 0.2s ease !important;
+}
+
+.sdi-btn-edit {
+    background: white !important;
+    border-color: var(--sdi-primary) !important;
+    color: var(--sdi-primary) !important;
+}
+
+.sdi-btn-edit:hover {
+    background: var(--sdi-primary) !important;
+    color: white !important;
+}
+
+.sdi-btn-duplicate {
+    background: white !important;
+    border-color: var(--sdi-gray-400) !important;
+    color: var(--sdi-gray-700) !important;
+}
+
+.sdi-btn-duplicate:hover {
+    background: var(--sdi-gray-700) !important;
+    color: white !important;
+}
+
+.sdi-btn-delete {
+    background: white !important;
+    border-color: var(--sdi-danger) !important;
+    color: var(--sdi-danger) !important;
+}
+
+.sdi-btn-delete:hover {
+    background: var(--sdi-danger) !important;
+    color: white !important;
+}
+
+/* ========================================
+   Form Styles
+   ======================================== */
+.sdi-form-card {
+    background: white;
+    border: 1px solid var(--sdi-gray-300);
+    border-radius: 8px;
+    box-shadow: var(--sdi-shadow);
+    padding: 30px;
+    margin-top: 20px;
+}
+
+.sdi-form-header {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid var(--sdi-gray-200);
+}
+
+.sdi-form-header h2 {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--sdi-gray-900);
+    margin: 0;
+}
+
+.sdi-form-section {
+    margin-bottom: 30px;
+}
+
+.sdi-form-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--sdi-gray-900);
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--sdi-gray-200);
+}
+
+.form-table th {
+    padding: 15px 20px 15px 0 !important;
+    width: 220px;
+    font-weight: 600 !important;
+    color: var(--sdi-gray-700) !important;
+}
+
+.form-table td {
+    padding: 15px 0 !important;
+}
+
+.form-table input[type="text"],
+.form-table input[type="number"],
+.form-table select,
+.form-table textarea {
+    border-color: var(--sdi-gray-300) !important;
+    border-radius: var(--sdi-border-radius) !important;
+    transition: all 0.2s ease !important;
+}
+
+.form-table input[type="text"]:focus,
+.form-table input[type="number"]:focus,
+.form-table select:focus,
+.form-table textarea:focus {
+    border-color: var(--sdi-primary) !important;
+    box-shadow: 0 0 0 1px var(--sdi-primary) !important;
+}
+
+.form-table .description {
+    color: var(--sdi-gray-500) !important;
+    font-size: 13px !important;
+    margin-top: 6px !important;
+}
+
+/* ========================================
+   Toggle Switch
+   ======================================== */
+.sdi-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sdi-toggle input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 44px;
+    height: 24px;
+    background: var(--sdi-gray-300);
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin: 0;
+}
+
+.sdi-toggle input[type="checkbox"]::before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: white;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.sdi-toggle input[type="checkbox"]:checked {
+    background: var(--sdi-success);
+}
+
+.sdi-toggle input[type="checkbox"]:checked::before {
+    transform: translateX(20px);
+}
+
+.sdi-toggle-label {
+    font-weight: 500;
+    color: var(--sdi-gray-700);
+}
+
+/* ========================================
+   Manual Input Section
+   ======================================== */
+.sdi-manual-input {
+    margin-top: 15px;
+    padding: 15px;
+    background: var(--sdi-gray-100);
+    border: 1px dashed var(--sdi-gray-300);
+    border-radius: var(--sdi-border-radius);
+}
+
+.sdi-manual-input strong {
+    color: var(--sdi-gray-700);
+    display: block;
+    margin-bottom: 8px;
+}
+
+.sdi-manual-input input[type="number"] {
+    width: 200px !important;
+    margin-right: 10px;
+}
+
+/* ========================================
+   Notices
+   ======================================== */
+.sdi-notice {
+    border-left: 4px solid;
+    padding: 12px 16px;
+    margin: 20px 0;
+    border-radius: 0 var(--sdi-border-radius) var(--sdi-border-radius) 0;
+    box-shadow: var(--sdi-shadow-sm);
+}
+
+.sdi-notice.info {
+    background: #f0f6fc;
+    border-left-color: var(--sdi-primary);
+    color: #0c5087;
+}
+
+.sdi-notice.success {
+    background: #edfaef;
+    border-left-color: var(--sdi-success);
+    color: #004d1a;
+}
+
+.sdi-notice.warning {
+    background: #fcf9e8;
+    border-left-color: var(--sdi-warning);
+    color: #614200;
+}
+
+.sdi-notice.error {
+    background: #fcf0f1;
+    border-left-color: var(--sdi-danger);
+    color: #8a0000;
+}
+
+.sdi-notice p {
+    margin: 0 0 8px 0;
+}
+
+.sdi-notice p:last-child {
+    margin-bottom: 0;
+}
+
+.sdi-notice ul {
+    margin: 10px 0 0 20px;
+}
+
+/* ========================================
+   Submit Actions
+   ======================================== */
+.sdi-submit-actions {
+    display: flex;
+    gap: 10px;
+    padding-top: 20px;
+    border-top: 1px solid var(--sdi-gray-200);
+    margin-top: 30px;
+}
+
+.sdi-btn-primary {
+    background: var(--sdi-primary) !important;
+    border-color: var(--sdi-primary) !important;
+    color: white !important;
+    padding: 10px 24px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    height: auto !important;
+    box-shadow: var(--sdi-shadow-sm) !important;
+    transition: all 0.2s ease !important;
+}
+
+.sdi-btn-primary:hover {
+    background: var(--sdi-primary-dark) !important;
+    border-color: var(--sdi-primary-dark) !important;
+    box-shadow: var(--sdi-shadow) !important;
+    transform: translateY(-1px);
+}
+
+.sdi-btn-secondary {
+    padding: 10px 24px !important;
+    font-size: 14px !important;
+    height: auto !important;
+}
+
+/* ========================================
+   Footer Info
+   ======================================== */
+.sdi-footer-info {
+    margin-top: 30px;
+    padding: 20px;
+    background: var(--sdi-gray-100);
+    border-radius: var(--sdi-border-radius);
+    border: 1px solid var(--sdi-gray-300);
+}
+
+.sdi-footer-info strong {
+    color: var(--sdi-gray-900);
+}
+
+/* ========================================
+   Responsive Design
+   ======================================== */
+@media screen and (max-width: 782px) {
+    .sdi-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .sdi-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .sdi-actions .button {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .form-table th {
+        width: auto;
+        padding: 10px 0 !important;
+        display: block;
+    }
+    
+    .form-table td {
+        display: block;
+        padding: 5px 0 15px 0 !important;
+    }
+}
+
+/* ========================================
+   Loading State
+   ======================================== */
+.sdi-loading {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--sdi-gray-300);
+    border-top-color: var(--sdi-primary);
+    border-radius: 50%;
+    animation: sdi-spin 0.6s linear infinite;
+}
+
+@keyframes sdi-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   Tooltips
+   ======================================== */
+.sdi-tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.sdi-tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 12px;
+    background: var(--sdi-gray-900);
+    color: white;
+    font-size: 12px;
+    border-radius: var(--sdi-border-radius);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    margin-bottom: 5px;
+}
+
+.sdi-tooltip:hover::after {
+    opacity: 1;
+}
+

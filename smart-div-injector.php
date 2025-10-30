@@ -23,6 +23,7 @@ class Smart_Div_Injector {
         // Admin
         add_action( 'admin_menu', [ $this, 'add_settings_page' ] );
         add_action( 'admin_init', [ $this, 'handle_actions' ] );
+        add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
 
         // Multisite: aggiungi menu anche nel Network Admin (opzionale)
         if ( is_multisite() ) {
@@ -31,6 +32,23 @@ class Smart_Div_Injector {
 
         // Frontend
         add_action( 'wp_enqueue_scripts', [ $this, 'maybe_enqueue_frontend' ] );
+    }
+    
+    /**
+     * Enqueue admin CSS
+     */
+    public function enqueue_admin_assets( $hook ) {
+        // Carica solo nella nostra pagina
+        if ( $hook !== 'toplevel_page_smart-div-injector' ) {
+            return;
+        }
+        
+        wp_enqueue_style( 
+            'sdi-admin-style', 
+            plugins_url( 'admin-style.css', __FILE__ ), 
+            [], 
+            '2.0.0' 
+        );
     }
     
     /**
@@ -267,9 +285,16 @@ class Smart_Div_Injector {
         
         ?>
         <div class="wrap">
-            <h1 class="wp-heading-inline">Smart Div Injector</h1>
-            <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector&action=add' ) ); ?>" class="page-title-action">Aggiungi nuova regola</a>
-            <hr class="wp-header-end">
+            <div class="sdi-header">
+                <h1>
+                    <span class="dashicons dashicons-admin-generic"></span>
+                    Smart Div Injector
+                </h1>
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector&action=add' ) ); ?>" class="button sdi-add-button">
+                    <span class="dashicons dashicons-plus-alt"></span>
+                    Aggiungi Nuova Regola
+                </a>
+            </div>
             
             <?php if ( is_multisite() ) : ?>
                 <div class="notice notice-info">
@@ -283,85 +308,98 @@ class Smart_Div_Injector {
             <?php endif; ?>
             
             <?php if ( $message === 'added' ) : ?>
-                <div class="notice notice-success is-dismissible">
-                    <p><strong>Regola aggiunta con successo!</strong></p>
+                <div class="sdi-notice success">
+                    <p><strong>✓ Regola aggiunta con successo!</strong></p>
                 </div>
             <?php elseif ( $message === 'updated' ) : ?>
-                <div class="notice notice-success is-dismissible">
-                    <p><strong>Regola aggiornata con successo!</strong></p>
+                <div class="sdi-notice success">
+                    <p><strong>✓ Regola aggiornata con successo!</strong></p>
                 </div>
             <?php elseif ( $message === 'deleted' ) : ?>
-                <div class="notice notice-success is-dismissible">
-                    <p><strong>Regola eliminata con successo!</strong></p>
+                <div class="sdi-notice success">
+                    <p><strong>✓ Regola eliminata con successo!</strong></p>
                 </div>
             <?php elseif ( $message === 'duplicated' ) : ?>
-                <div class="notice notice-success is-dismissible">
-                    <p><strong>Regola duplicata con successo!</strong></p>
+                <div class="sdi-notice success">
+                    <p><strong>✓ Regola duplicata con successo!</strong></p>
                 </div>
             <?php endif; ?>
             
             <?php if ( empty( $rules ) ) : ?>
-                <div class="notice notice-info">
-                    <p><strong>Nessuna regola configurata.</strong> Clicca su "Aggiungi nuova regola" per iniziare.</p>
+                <div class="sdi-empty-state">
+                    <span class="dashicons dashicons-welcome-add-page"></span>
+                    <h3>Nessuna regola configurata</h3>
+                    <p>Inizia creando la tua prima regola di iniezione codice.</p>
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector&action=add' ) ); ?>" class="button button-primary button-large">
+                        <span class="dashicons dashicons-plus-alt"></span>
+                        Crea Prima Regola
+                    </a>
                 </div>
             <?php else : ?>
-                <table class="wp-list-table widefat fixed striped">
+                <table class="wp-list-table widefat fixed striped sdi-rules-table">
                     <thead>
                         <tr>
-                            <th scope="col" style="width: 50px;">Attiva</th>
-                            <th scope="col">Nome</th>
-                            <th scope="col">Tipo</th>
+                            <th scope="col" style="width: 120px;">Stato</th>
+                            <th scope="col">Nome Regola</th>
+                            <th scope="col">Tipo di Contenuto</th>
                             <th scope="col">Target</th>
-                            <th scope="col">Selettore</th>
-                            <th scope="col" style="width: 150px;">Azioni</th>
+                            <th scope="col">Selettore CSS</th>
+                            <th scope="col" style="width: 240px;">Azioni</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ( $rules as $rule_id => $rule ) : ?>
                             <tr>
                                 <td>
-                                    <?php if ( $rule['active'] ) : ?>
-                                        <span class="dashicons dashicons-yes-alt" style="color: green;" title="Attiva"></span>
-                                    <?php else : ?>
-                                        <span class="dashicons dashicons-dismiss" style="color: #999;" title="Non attiva"></span>
-                                    <?php endif; ?>
+                                    <span class="sdi-status-badge <?php echo $rule['active'] ? 'active' : 'inactive'; ?>">
+                                        <span class="dashicons dashicons-<?php echo $rule['active'] ? 'yes-alt' : 'dismiss'; ?>"></span>
+                                        <?php echo $rule['active'] ? 'Attiva' : 'Non attiva'; ?>
+                                    </span>
                                 </td>
                                 <td><strong><?php echo esc_html( $rule['name'] ); ?></strong></td>
                                 <td>
-                                    <?php 
-                                    switch ( $rule['match_mode'] ) {
-                                        case 'single_posts':
-                                            echo 'Tutti gli articoli';
-                                            break;
-                                        case 'category_archive':
-                                            echo 'Pagina archivio categoria';
-                                            break;
-                                        case 'single_posts_category':
-                                            echo 'Articoli di una categoria';
-                                            break;
-                                        case 'page':
-                                            echo 'Pagina specifica';
-                                            break;
-                                    }
-                                    ?>
+                                    <span class="sdi-type-badge">
+                                        <?php 
+                                        switch ( $rule['match_mode'] ) {
+                                            case 'single_posts':
+                                                echo '📄 Tutti gli articoli';
+                                                break;
+                                            case 'category_archive':
+                                                echo '📁 Archivio categoria';
+                                                break;
+                                            case 'single_posts_category':
+                                                echo '🏷️ Articoli per categoria';
+                                                break;
+                                            case 'page':
+                                                echo '📃 Pagina specifica';
+                                                break;
+                                        }
+                                        ?>
+                                    </span>
                                 </td>
                                 <td>
-                                    <?php 
-                                    if ( ( $rule['match_mode'] === 'single_posts_category' || $rule['match_mode'] === 'category_archive' ) && $rule['category_id'] ) {
-                                        $cat = get_category( $rule['category_id'] );
-                                        echo $cat ? esc_html( $cat->name ) : 'Categoria #' . $rule['category_id'];
-                                    } elseif ( $rule['match_mode'] === 'page' && $rule['page_id'] ) {
-                                        echo get_the_title( $rule['page_id'] ) ?: 'Pagina #' . $rule['page_id'];
-                                    } else {
-                                        echo '—';
-                                    }
-                                    ?>
+                                    <div class="sdi-target-info">
+                                        <?php 
+                                        if ( ( $rule['match_mode'] === 'single_posts_category' || $rule['match_mode'] === 'category_archive' ) && $rule['category_id'] ) {
+                                            $cat = get_category( $rule['category_id'] );
+                                            echo '<span class="dashicons dashicons-category"></span>';
+                                            echo $cat ? esc_html( $cat->name ) : 'Categoria #' . $rule['category_id'];
+                                        } elseif ( $rule['match_mode'] === 'page' && $rule['page_id'] ) {
+                                            echo '<span class="dashicons dashicons-admin-page"></span>';
+                                            echo get_the_title( $rule['page_id'] ) ?: 'Pagina #' . $rule['page_id'];
+                                        } else {
+                                            echo '—';
+                                        }
+                                        ?>
+                                    </div>
                                 </td>
-                                <td><code><?php echo esc_html( $rule['selector'] ); ?></code></td>
+                                <td><code class="sdi-code"><?php echo esc_html( $rule['selector'] ); ?></code></td>
                                 <td>
-                                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector&action=edit&rule_id=' . $rule_id ) ); ?>" class="button button-small">Modifica</a>
-                                    <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=duplicate&rule_id=' . $rule_id ), 'duplicate_rule_' . $rule_id ) ); ?>" class="button button-small">Duplica</a>
-                                    <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=delete&rule_id=' . $rule_id ), 'delete_rule_' . $rule_id ) ); ?>" class="button button-small button-link-delete" onclick="return confirm('Sei sicuro di voler eliminare questa regola?');">Elimina</a>
+                                    <div class="sdi-actions">
+                                        <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector&action=edit&rule_id=' . $rule_id ) ); ?>" class="button sdi-btn-edit">Modifica</a>
+                                        <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=duplicate&rule_id=' . $rule_id ), 'duplicate_rule_' . $rule_id ) ); ?>" class="button sdi-btn-duplicate">Duplica</a>
+                                        <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=delete&rule_id=' . $rule_id ), 'delete_rule_' . $rule_id ) ); ?>" class="button sdi-btn-delete" onclick="return confirm('Sei sicuro di voler eliminare questa regola?');">Elimina</a>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -425,9 +463,19 @@ class Smart_Div_Injector {
         
         ?>
         <div class="wrap">
-            <h1><?php echo esc_html( $page_title ); ?></h1>
+            <div class="sdi-header">
+                <h1>
+                    <span class="dashicons dashicons-<?php echo $is_edit ? 'edit' : 'plus-alt'; ?>"></span>
+                    <?php echo esc_html( $page_title ); ?>
+                </h1>
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector' ) ); ?>" class="button">
+                    <span class="dashicons dashicons-arrow-left-alt"></span>
+                    Torna alla Lista
+                </a>
+            </div>
             
-            <form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector' ) ); ?>">
+            <div class="sdi-form-card">
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector' ) ); ?>">
                 <?php wp_nonce_field( 'sdi_rule_action', 'sdi_nonce' ); ?>
                 <input type="hidden" name="sdi_action" value="<?php echo esc_attr( $action ); ?>">
                 <?php if ( $is_edit ) : ?>
@@ -446,10 +494,10 @@ class Smart_Div_Injector {
                     <tr>
                         <th scope="row"><label for="rule_active">Stato</label></th>
                         <td>
-                            <label>
+                            <div class="sdi-toggle">
                                 <input type="checkbox" name="active" id="rule_active" value="1" <?php checked( $rule['active'], true ); ?>>
-                                Regola attiva
-                            </label>
+                                <span class="sdi-toggle-label">Regola attiva</span>
+                            </div>
                             <p class="description">Se disattivata, la regola non verrà applicata sul frontend</p>
                         </td>
                     </tr>
@@ -504,10 +552,10 @@ class Smart_Div_Injector {
                             ?>
                             
                             <?php if ( $total_pages > $limit ) : ?>
-                                <p class="description" style="color: #d63638; font-weight: 600;">
-                                    ⚠️ Il tuo sito ha <?php echo number_format( $total_pages ); ?> pagine. Il dropdown mostra solo le prime <?php echo $limit; ?>.
-                                    <br>Se non trovi la pagina, usa il campo ID manuale qui sotto.
-                                </p>
+                                <div class="sdi-notice warning" style="margin-bottom: 15px;">
+                                    <p><strong>⚠️ Attenzione:</strong> Il tuo sito ha <strong><?php echo number_format( $total_pages ); ?></strong> pagine. Il dropdown mostra solo le prime <strong><?php echo $limit; ?></strong>.</p>
+                                    <p>Se non trovi la pagina, usa il campo ID manuale qui sotto.</p>
+                                </div>
                             <?php endif; ?>
                             
                             <select name="page_id" id="page_select" class="regular-text" style="margin-bottom: 10px;">
@@ -524,17 +572,16 @@ class Smart_Div_Injector {
                                 <?php endforeach; ?>
                             </select>
                             
-                            <div style="margin-top: 10px;">
-                                <label>
-                                    <strong>Oppure inserisci l'ID manualmente:</strong><br>
+                            <div class="sdi-manual-input">
+                                <strong>Oppure inserisci l'ID manualmente:</strong>
+                                <div>
                                     <input type="number" 
                                            id="page_manual" 
                                            min="1" 
                                            value="<?php echo esc_attr( $rule['page_id'] > 0 ? $rule['page_id'] : '' ); ?>" 
-                                           placeholder="Esempio: 42" 
-                                           style="width: 200px;" />
+                                           placeholder="Esempio: 42" />
                                     <button type="button" class="button" onclick="sdiSetPageFromManual()">Usa questo ID</button>
-                                </label>
+                                </div>
                             </div>
                             
                             <p class="description">Seleziona una pagina dal dropdown oppure inserisci l'ID manualmente</p>
@@ -571,11 +618,17 @@ class Smart_Div_Injector {
                     </tr>
                 </table>
                 
-                <p class="submit">
-                    <button type="submit" class="button button-primary"><?php echo $is_edit ? 'Aggiorna Regola' : 'Salva Regola'; ?></button>
-                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector' ) ); ?>" class="button">Annulla</a>
-                </p>
+                <div class="sdi-submit-actions">
+                    <button type="submit" class="button sdi-btn-primary">
+                        <span class="dashicons dashicons-<?php echo $is_edit ? 'update' : 'saved'; ?>"></span>
+                        <?php echo $is_edit ? 'Aggiorna Regola' : 'Salva Regola'; ?>
+                    </button>
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector' ) ); ?>" class="button sdi-btn-secondary">
+                        Annulla
+                    </a>
+                </div>
             </form>
+            </div>
         </div>
         
         <script>

@@ -24,12 +24,14 @@ Perfect for:
 ## Features
 
 ✅ **Unlimited Rules** - Create as many injection rules as you need  
-✅ **Flexible Targeting** - Target all posts, posts by category, or specific pages  
+✅ **Flexible Targeting** - Target all posts, category archives, posts by category, or specific pages  
 ✅ **Multiple Injection Positions** - Append, prepend, before, after, or replace content  
 ✅ **CSS Selector Support** - Use any valid CSS selector to target elements  
 ✅ **Script Activation** - Automatically activates injected scripts  
 ✅ **Rule Management** - Add, edit, duplicate, and delete rules with ease  
 ✅ **Enable/Disable Rules** - Activate or deactivate rules without deleting them  
+✅ **Modern UI/UX** - Beautiful and intuitive admin interface with custom styling  
+✅ **Responsive Design** - Fully responsive admin panel that works on all devices  
 ✅ **Security First** - Respects WordPress capabilities for unfiltered HTML  
 ✅ **Developer Friendly** - Includes filters for customization  
 ✅ **User-Friendly Interface** - Clear admin panel with validation warnings  
@@ -76,11 +78,12 @@ Enable or disable the rule without deleting it. Inactive rules won't run on the 
 #### 3. Content Type
 Choose where to apply the injection:
 - **All Posts** (Tutti gli articoli) - Inject on all single post pages
-- **Posts by Category** (Articoli di una categoria) - Inject only on posts in a specific category
+- **Category Archive Page** (Pagina archivio categoria) - Inject on the category archive page (e.g., example.com/category/news/)
+- **Posts by Category** (Articoli di una categoria) - Inject only on single posts that belong to a specific category
 - **Specific Page** (Pagina specifica) - Inject only on a selected page
 
 #### 4. Category (when applicable)
-If you selected "Posts by Category", choose which category to target.
+If you selected "Category Archive Page" or "Posts by Category", choose which category to target.
 
 #### 5. Page (when applicable)
 If you selected "Specific Page", choose which page to target from the dropdown, or enter the Page ID manually.
@@ -111,63 +114,86 @@ Enter the HTML/CSS/JavaScript code you want to inject. This field accepts any va
 
 ## Usage Examples
 
-### Example 1: Add a Banner to a Specific Post
+### Example 1: Add a Banner to All Posts
 
 **Configuration:**
-- Activation Condition: `Post ID Only`
-- Post ID: `123`
+- Rule Name: `Banner on All Articles`
+- Active: ✓
+- Content Type: `All Posts`
 - CSS Selector: `.entry-content`
 - Position: `Prepend`
 - Code:
 ```html
 <div class="custom-banner" style="background: #f0f0f0; padding: 20px; margin-bottom: 20px;">
     <h3>Special Announcement!</h3>
-    <p>This is a custom message for this specific post.</p>
+    <p>This is a custom message for all articles.</p>
 </div>
 ```
 
-### Example 2: Add Tracking to All Posts in a Category
+### Example 2: Add Banner on Category Archive Page
 
 **Configuration:**
-- Activation Condition: `Category Only`
+- Rule Name: `News Category Banner`
+- Active: ✓
+- Content Type: `Category Archive Page`
+- Category: `News`
+- CSS Selector: `.category-description`
+- Position: `After`
+- Code:
+```html
+<div class="category-banner">
+    <h2>Latest News</h2>
+    <p>Stay updated with our latest news articles!</p>
+</div>
+```
+
+### Example 3: Add Tracking to Posts in a Category
+
+**Configuration:**
+- Rule Name: `Tracking for News Posts`
+- Active: ✓
+- Content Type: `Posts by Category`
 - Category: `News`
 - CSS Selector: `body`
 - Position: `Append`
 - Code:
 ```html
 <script>
-    console.log('Tracking code for News category');
+    console.log('Tracking code for News category posts');
     // Your tracking code here
 </script>
 ```
 
-### Example 3: Insert Custom Widget After Content
+### Example 4: Insert Custom Widget on Specific Page
 
 **Configuration:**
-- Activation Condition: `Post ID AND Category`
-- Post ID: `456`
-- Category: `Featured`
-- CSS Selector: `.post-content`
+- Rule Name: `Homepage Widget`
+- Active: ✓
+- Content Type: `Specific Page`
+- Page: `Home` (ID: 2)
+- CSS Selector: `.main-content`
 - Position: `After`
 - Code:
 ```html
-<div class="related-posts-widget">
-    <h4>You might also like:</h4>
+<div class="featured-widget">
+    <h4>Featured Content</h4>
     <!-- Your custom widget HTML -->
 </div>
 ```
 
-### Example 4: Add Custom Styling
+### Example 5: Add Custom Styling to Category Posts
 
 **Configuration:**
-- Activation Condition: `Category Only`
-- Category: `Special`
+- Rule Name: `Special Category Styling`
+- Active: ✓
+- Content Type: `Posts by Category`
+- Category: `Featured`
 - CSS Selector: `head`
 - Position: `Append`
 - Code:
 ```html
 <style>
-    .special-category-post {
+    .featured-post {
         background: linear-gradient(to right, #ff6b6b, #feca57);
         padding: 20px;
     }
@@ -182,37 +208,75 @@ Modify the injection payload before it's injected into the page.
 
 **Parameters:**
 - `$payload` (array) - Array containing `selector`, `position`, and `code`
-- `$opts` (array) - All plugin options
+- `$rule` (array) - The complete rule data
+- `$rule_id` (string) - The unique ID of the rule
 
 **Example:**
 ```php
-add_filter( 'sdi_injection_payload', function( $payload, $opts ) {
-    // Modify the code before injection
+add_filter( 'sdi_injection_payload', function( $payload, $rule, $rule_id ) {
+    // Modify the code before injection (e.g., add dynamic content)
     $payload['code'] = str_replace( '{{site_name}}', get_bloginfo( 'name' ), $payload['code'] );
+    $payload['code'] = str_replace( '{{rule_name}}', $rule['name'], $payload['code'] );
     
     return $payload;
-}, 10, 2 );
+}, 10, 3 );
+```
+
+**Advanced Example - Conditional Modification:**
+```php
+add_filter( 'sdi_injection_payload', function( $payload, $rule, $rule_id ) {
+    // Only modify specific rules
+    if ( $rule['name'] === 'Dynamic Banner' ) {
+        // Add current user info
+        $current_user = wp_get_current_user();
+        if ( $current_user->ID ) {
+            $payload['code'] = str_replace( 
+                '{{username}}', 
+                $current_user->display_name, 
+                $payload['code'] 
+            );
+        }
+    }
+    
+    return $payload;
+}, 10, 3 );
 ```
 
 ## How It Works
 
-1. **Condition Check** - The plugin checks if the current page matches your configured conditions
-2. **Script Registration** - If conditions are met, the plugin registers an inline script
-3. **DOM Ready** - The script waits for the DOM to be fully loaded
-4. **Element Selection** - The target element is selected using your CSS selector
-5. **Code Injection** - Your code is injected in the specified position
-6. **Script Activation** - Any `<script>` tags in your code are automatically activated
+1. **Rules Loading** - The plugin loads all active rules from the database
+2. **Condition Check** - For each rule, the plugin checks if the current page matches the rule's conditions
+3. **Payload Collection** - All matching rules are collected into an array
+4. **Script Registration** - If there are matching rules, the plugin registers an inline script with all payloads
+5. **DOM Ready** - The script waits for the DOM to be fully loaded
+6. **Sequential Processing** - Each rule is processed in order:
+   - The target element is selected using the CSS selector
+   - The code is injected in the specified position
+   - Any `<script>` tags are automatically activated
+7. **Error Handling** - Each rule is executed independently; if one fails, others continue
 
 ## Validation and Warnings
 
-The plugin includes a smart validation system that warns you if:
-- CSS selector is not set
-- Code to inject is not set
-- Post ID is required but not set (based on activation condition)
-- Category is required but not set (based on activation condition)
-- Both Post ID and Category are required but not set (for AND condition)
+The plugin includes validation at both form level and runtime level:
 
-These warnings appear at the top of the settings page to help you complete the configuration correctly.
+### Form Validation
+When creating or editing a rule, the following fields are required:
+- **Rule Name** - Must be provided
+- **CSS Selector** - Must be provided
+- **Code to Inject** - Must be provided
+
+### Conditional Validation
+Based on the Content Type selected:
+- **Category Archive Page** - Requires a category to be selected
+- **Posts by Category** - Requires a category to be selected
+- **Specific Page** - Requires a page to be selected
+- **All Posts** - No additional fields required
+
+### Runtime Validation
+On the frontend, rules are skipped if:
+- The rule is marked as inactive
+- Required fields (selector, code) are empty
+- The page conditions don't match the rule's targeting
 
 ## Security Considerations
 
@@ -361,11 +425,25 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 - Enable/disable rules without deleting them
 - New rule management interface with list view
 - Each rule has a name for easy identification
-- Simplified targeting: All posts, Posts by category, or Specific page
+- **Four targeting options:**
+  - All posts (all single post pages)
+  - Category Archive Page (category archive pages like /category/news/)
+  - Posts by Category (single posts in a specific category)
+  - Specific Page (individual pages)
+- **Modern UI/UX:**
+  - Custom CSS styling with beautiful color palette
+  - Responsive design for mobile, tablet, and desktop
+  - Status badges with visual indicators
+  - Improved button styles with hover effects
+  - Toggle switch for enable/disable rules
+  - Empty state design for better onboarding
+  - Better spacing and typography
 - Memory optimization: Limits queries for sites with thousands of posts
 - Manual ID input for posts/pages not in dropdown
 - Added Author URI: https://dway.agency
 - Complete UI/UX redesign for better usability
+- Updated filter hook parameters to include rule data and rule ID
+- Sequential rule processing with independent error handling
 
 ### 1.1.1
 - Fixed memory exhaustion on sites with many posts
