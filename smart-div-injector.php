@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Smart Div Injector
  * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Author: DWAY SRL
  * License: GPL-2.0+
  * Text Domain: smart-div-injector
@@ -371,52 +371,197 @@ class Smart_Div_Injector {
 
     public function field_post_id() {
         $opts = $this->get_options();
+        
+        // Limita il numero di post per evitare problemi di memoria
+        $post_count = wp_count_posts( 'post' );
+        $total_posts = isset( $post_count->publish ) ? $post_count->publish : 0;
+        $limit = 500; // Carica max 500 articoli
+        
         $posts = get_posts( [ 
-            'numberposts' => -1,
+            'numberposts' => $limit,
             'post_status' => 'publish',
-            'orderby'     => 'title',
-            'order'       => 'ASC'
+            'orderby'     => 'date',
+            'order'       => 'DESC',
+            'fields'      => 'ids' // Carica solo gli ID per risparmiare memoria
         ] );
+        
         ?>
         <div id="sdi_post_row">
-            <select name="<?php echo esc_attr( self::OPTION_KEY ); ?>[post_id]" class="regular-text">
-                <option value="0">— Seleziona un articolo —</option>
-                <?php foreach ( $posts as $post ) : ?>
-                    <option value="<?php echo esc_attr( $post->ID ); ?>" <?php selected( $opts['post_id'], $post->ID ); ?>>
-                        <?php echo esc_html( $post->post_title . ' (ID: ' . $post->ID . ')' ); ?>
+            <?php if ( $total_posts > $limit ) : ?>
+                <p class="description" style="color: #d63638; font-weight: 600;">
+                    ⚠️ Il tuo sito ha <?php echo number_format( $total_posts ); ?> articoli. Il dropdown mostra solo gli ultimi <?php echo $limit; ?>.
+                    <br>Se non trovi l'articolo, usa il campo ID manuale qui sotto.
+                </p>
+            <?php endif; ?>
+            
+            <select name="<?php echo esc_attr( self::OPTION_KEY ); ?>[post_id]" id="sdi_post_select" class="regular-text" style="margin-bottom: 10px;">
+                <option value="0">— Seleziona un articolo dal dropdown —</option>
+                <?php foreach ( $posts as $post_id ) : 
+                    $post_title = get_the_title( $post_id );
+                    if ( empty( $post_title ) ) {
+                        $post_title = '(Nessun titolo)';
+                    }
+                ?>
+                    <option value="<?php echo esc_attr( $post_id ); ?>" <?php selected( $opts['post_id'], $post_id ); ?>>
+                        <?php echo esc_html( $post_title . ' (ID: ' . $post_id . ')' ); ?>
                     </option>
                 <?php endforeach; ?>
             </select>
-            <p class="description">Seleziona l'articolo su cui attivare l'iniezione.</p>
+            
+            <div style="margin-top: 10px;">
+                <label>
+                    <strong>Oppure inserisci l'ID manualmente:</strong><br>
+                    <input type="number" 
+                           id="sdi_post_manual" 
+                           min="1" 
+                           value="<?php echo esc_attr( $opts['post_id'] > 0 ? $opts['post_id'] : '' ); ?>" 
+                           placeholder="Esempio: 123" 
+                           style="width: 200px;" />
+                    <button type="button" class="button" onclick="sdiSetPostFromManual()">Usa questo ID</button>
+                </label>
+            </div>
+            
+            <p class="description">Seleziona un articolo dal dropdown oppure inserisci l'ID manualmente.</p>
+            
+            <script>
+            function sdiSetPostFromManual() {
+                var manualInput = document.getElementById('sdi_post_manual');
+                var select = document.getElementById('sdi_post_select');
+                var manualValue = manualInput.value;
+                
+                if (manualValue && manualValue > 0) {
+                    // Verifica se l'opzione esiste già nel select
+                    var optionExists = false;
+                    for (var i = 0; i < select.options.length; i++) {
+                        if (select.options[i].value == manualValue) {
+                            select.selectedIndex = i;
+                            optionExists = true;
+                            break;
+                        }
+                    }
+                    
+                    // Se non esiste, aggiungi l'opzione
+                    if (!optionExists) {
+                        var option = document.createElement('option');
+                        option.value = manualValue;
+                        option.text = 'ID: ' + manualValue + ' (inserito manualmente)';
+                        option.selected = true;
+                        select.add(option);
+                    }
+                    
+                    alert('ID articolo impostato: ' + manualValue);
+                }
+            }
+            
+            // Sincronizza campo manuale quando si cambia il select
+            document.getElementById('sdi_post_select').addEventListener('change', function() {
+                document.getElementById('sdi_post_manual').value = this.value > 0 ? this.value : '';
+            });
+            </script>
         </div>
         <?php
     }
     
     public function field_page_id() {
         $opts = $this->get_options();
-        $pages = get_pages( [ 
+        
+        // Limita il numero di pagine per evitare problemi di memoria
+        $page_count = wp_count_posts( 'page' );
+        $total_pages = isset( $page_count->publish ) ? $page_count->publish : 0;
+        $limit = 500; // Carica max 500 pagine
+        
+        $pages = get_posts( [ 
+            'post_type'   => 'page',
+            'numberposts' => $limit,
             'post_status' => 'publish',
-            'sort_column' => 'post_title',
-            'sort_order'  => 'ASC'
+            'orderby'     => 'title',
+            'order'       => 'ASC',
+            'fields'      => 'ids' // Carica solo gli ID per risparmiare memoria
         ] );
+        
         ?>
         <div id="sdi_page_row">
-            <select name="<?php echo esc_attr( self::OPTION_KEY ); ?>[page_id]" class="regular-text">
-                <option value="0">— Seleziona una pagina —</option>
-                <?php foreach ( $pages as $page ) : ?>
-                    <option value="<?php echo esc_attr( $page->ID ); ?>" <?php selected( $opts['page_id'], $page->ID ); ?>>
-                        <?php echo esc_html( $page->post_title . ' (ID: ' . $page->ID . ')' ); ?>
+            <?php if ( $total_pages > $limit ) : ?>
+                <p class="description" style="color: #d63638; font-weight: 600;">
+                    ⚠️ Il tuo sito ha <?php echo number_format( $total_pages ); ?> pagine. Il dropdown mostra solo le prime <?php echo $limit; ?>.
+                    <br>Se non trovi la pagina, usa il campo ID manuale qui sotto.
+                </p>
+            <?php endif; ?>
+            
+            <select name="<?php echo esc_attr( self::OPTION_KEY ); ?>[page_id]" id="sdi_page_select" class="regular-text" style="margin-bottom: 10px;">
+                <option value="0">— Seleziona una pagina dal dropdown —</option>
+                <?php foreach ( $pages as $page_id ) : 
+                    $page_title = get_the_title( $page_id );
+                    if ( empty( $page_title ) ) {
+                        $page_title = '(Nessun titolo)';
+                    }
+                ?>
+                    <option value="<?php echo esc_attr( $page_id ); ?>" <?php selected( $opts['page_id'], $page_id ); ?>>
+                        <?php echo esc_html( $page_title . ' (ID: ' . $page_id . ')' ); ?>
                     </option>
                 <?php endforeach; ?>
             </select>
-            <p class="description">Seleziona la pagina su cui attivare l'iniezione.</p>
+            
+            <div style="margin-top: 10px;">
+                <label>
+                    <strong>Oppure inserisci l'ID manualmente:</strong><br>
+                    <input type="number" 
+                           id="sdi_page_manual" 
+                           min="1" 
+                           value="<?php echo esc_attr( $opts['page_id'] > 0 ? $opts['page_id'] : '' ); ?>" 
+                           placeholder="Esempio: 42" 
+                           style="width: 200px;" />
+                    <button type="button" class="button" onclick="sdiSetPageFromManual()">Usa questo ID</button>
+                </label>
+            </div>
+            
+            <p class="description">Seleziona una pagina dal dropdown oppure inserisci l'ID manualmente.</p>
+            
+            <script>
+            function sdiSetPageFromManual() {
+                var manualInput = document.getElementById('sdi_page_manual');
+                var select = document.getElementById('sdi_page_select');
+                var manualValue = manualInput.value;
+                
+                if (manualValue && manualValue > 0) {
+                    // Verifica se l'opzione esiste già nel select
+                    var optionExists = false;
+                    for (var i = 0; i < select.options.length; i++) {
+                        if (select.options[i].value == manualValue) {
+                            select.selectedIndex = i;
+                            optionExists = true;
+                            break;
+                        }
+                    }
+                    
+                    // Se non esiste, aggiungi l'opzione
+                    if (!optionExists) {
+                        var option = document.createElement('option');
+                        option.value = manualValue;
+                        option.text = 'ID: ' + manualValue + ' (inserito manualmente)';
+                        option.selected = true;
+                        select.add(option);
+                    }
+                    
+                    alert('ID pagina impostato: ' + manualValue);
+                }
+            }
+            
+            // Sincronizza campo manuale quando si cambia il select
+            document.getElementById('sdi_page_select').addEventListener('change', function() {
+                document.getElementById('sdi_page_manual').value = this.value > 0 ? this.value : '';
+            });
+            </script>
         </div>
         <?php
     }
 
     public function field_category() {
         $opts = $this->get_options();
-        $categories = get_categories( [ 'hide_empty' => false ] );
+        $categories = get_categories( [ 
+            'hide_empty' => false,
+            'number'     => 1000 // Limita per sicurezza
+        ] );
         ?>
         <div id="sdi_category_row">
             <select name="<?php echo esc_attr( self::OPTION_KEY ); ?>[category_id]" class="regular-text">
@@ -427,7 +572,7 @@ class Smart_Div_Injector {
                     </option>
                 <?php endforeach; ?>
             </select>
-            <p class="description">Seleziona la categoria target per gli articoli.</p>
+            <p class="description">Seleziona la categoria target per gli articoli (max 1000 categorie).</p>
         </div>
         <?php
     }
