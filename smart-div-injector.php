@@ -241,9 +241,14 @@ class Smart_Div_Injector {
         ];
         
         // Sanitizza il codice
+        $code = $data['code'] ?? '';
+        
+        // Rimuovi escape automatici aggiunti da editor o copia/incolla
+        $code = stripslashes( $code );
+        
         if ( current_user_can( 'unfiltered_html' ) ) {
             // Gli amministratori possono inserire qualsiasi codice
-            $rule['code'] = $data['code'] ?? '';
+            $rule['code'] = $code;
         } else {
             // Per altri utenti, usa una whitelist permissiva ma sicura
             $allowed_html = wp_kses_allowed_html( 'post' );
@@ -271,7 +276,7 @@ class Smart_Div_Injector {
                 'class'         => true,
             ];
             
-            $rule['code'] = wp_kses( $data['code'] ?? '', $allowed_html );
+            $rule['code'] = wp_kses( $code, $allowed_html );
         }
         
         return $rule;
@@ -710,6 +715,17 @@ class Smart_Div_Injector {
                         <td>
                             <textarea name="code" id="code" rows="10" class="large-text code" spellcheck="false" placeholder="<div>Il tuo codice HTML/JS/CSS</div>" required><?php echo esc_textarea( $rule['code'] ); ?></textarea>
                             <p class="description">Il codice verrà inserito tal quale. Solo gli utenti con permesso <code>unfiltered_html</code> possono salvare script non sanitizzati.</p>
+                            
+                            <?php if ( ! empty( $rule['code'] ) && $is_edit ) : ?>
+                                <details style="margin-top: 15px;">
+                                    <summary style="cursor: pointer; font-weight: 600; color: #2271b1;">🔍 Debug: Mostra codice salvato nel database</summary>
+                                    <div style="margin-top: 10px; padding: 15px; background: #f0f0f1; border-left: 4px solid #2271b1; border-radius: 4px;">
+                                        <p style="margin: 0 0 10px 0;"><strong>Questo è esattamente il codice salvato nel database:</strong></p>
+                                        <pre style="background: white; padding: 10px; border: 1px solid #ddd; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;"><?php echo htmlspecialchars( $rule['code'], ENT_QUOTES, 'UTF-8' ); ?></pre>
+                                        <p style="margin: 10px 0 0 0; color: #d63638;"><strong>⚠️ Attenzione:</strong> Se vedi <code>\"</code> o <code>https:/</code> (un solo slash), il codice è corrotto. Cancella tutto e incolla di nuovo il codice originale da Google.</p>
+                                    </div>
+                                </details>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 </table>
@@ -1352,9 +1368,6 @@ class Smart_Div_Injector {
           var decodedCode = decodeURIComponent(atob(rule.code).split('').map(function(c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
           }).join(''));
-          
-          // Debug: mostra il codice decodificato nella console
-          console.log('Smart Div Injector: Codice decodificato per regola #' + (index + 1) + ':', decodedCode);
           
           insert(el, decodedCode, rule.position || 'append');
         } catch(e) { 
