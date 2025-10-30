@@ -226,6 +226,7 @@ class Smart_Div_Injector {
             'before_paragraph', 'after_paragraph',
             'before_image', 'after_image'
         ];
+        $valid_devices = [ 'both', 'desktop', 'mobile' ];
         
         $rule = [
             'name'              => isset( $data['name'] ) ? sanitize_text_field( $data['name'] ) : 'Regola senza nome',
@@ -236,6 +237,7 @@ class Smart_Div_Injector {
             'selector'          => isset( $data['selector'] ) ? sanitize_text_field( $data['selector'] ) : '',
             'position'          => in_array( $data['position'] ?? 'append', $valid_positions, true ) ? $data['position'] : 'append',
             'paragraph_number'  => isset( $data['paragraph_number'] ) ? absint( $data['paragraph_number'] ) : 1,
+            'device_target'     => in_array( $data['device_target'] ?? 'both', $valid_devices, true ) ? $data['device_target'] : 'both',
         ];
         
         // Sanitizza il codice
@@ -346,10 +348,11 @@ class Smart_Div_Injector {
                 <table class="wp-list-table widefat fixed striped sdi-rules-table">
                     <thead>
                         <tr>
-                            <th scope="col" style="width: 120px;">Stato</th>
+                            <th scope="col" style="width: 100px;">Stato</th>
                             <th scope="col">Nome Regola</th>
-                            <th scope="col">Tipo di Contenuto</th>
+                            <th scope="col">Tipo</th>
                             <th scope="col">Target</th>
+                            <th scope="col" style="width: 120px;">Dispositivo</th>
                             <th scope="col">Selettore CSS</th>
                             <th scope="col" style="width: 240px;">Azioni</th>
                         </tr>
@@ -400,6 +403,23 @@ class Smart_Div_Injector {
                                         ?>
                                     </div>
                                 </td>
+                                <td>
+                                    <?php
+                                    $device = $rule['device_target'] ?? 'both';
+                                    switch ( $device ) {
+                                        case 'desktop':
+                                            echo '<span title="Solo Desktop">💻 Desktop</span>';
+                                            break;
+                                        case 'mobile':
+                                            echo '<span title="Solo Mobile">📱 Mobile</span>';
+                                            break;
+                                        case 'both':
+                                        default:
+                                            echo '<span title="Desktop e Mobile">📱💻 Entrambi</span>';
+                                            break;
+                                    }
+                                    ?>
+                                </td>
                                 <td><code class="sdi-code"><?php echo esc_html( $rule['selector'] ); ?></code></td>
                                 <td>
                                     <div class="sdi-actions">
@@ -434,6 +454,7 @@ class Smart_Div_Injector {
             'selector'         => '',
             'position'         => 'append',
             'paragraph_number' => 1,
+            'device_target'    => 'both',
             'code'             => ''
         ];
         
@@ -507,6 +528,18 @@ class Smart_Div_Injector {
                                 <span class="sdi-toggle-label">Regola attiva</span>
                             </div>
                             <p class="description">Se disattivata, la regola non verrà applicata sul frontend</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row"><label for="device_target">Dispositivo target *</label></th>
+                        <td>
+                            <select name="device_target" id="device_target" class="regular-text">
+                                <option value="both" <?php selected( $rule['device_target'] ?? 'both', 'both' ); ?>>📱💻 Entrambi (Desktop e Mobile)</option>
+                                <option value="desktop" <?php selected( $rule['device_target'] ?? 'both', 'desktop' ); ?>>💻 Solo Desktop</option>
+                                <option value="mobile" <?php selected( $rule['device_target'] ?? 'both', 'mobile' ); ?>>📱 Solo Mobile</option>
+                            </select>
+                            <p class="description">Scegli su quale tipo di dispositivo applicare questa regola</p>
                         </td>
                     </tr>
                     
@@ -886,6 +919,7 @@ class Smart_Div_Injector {
         $current_id = get_the_ID();
         $is_single_post = is_single();
         $is_page = is_page();
+        $is_mobile = wp_is_mobile();
         
         // Array per raccogliere tutti i payload da iniettare via JS
         $payloads = [];
@@ -900,6 +934,15 @@ class Smart_Div_Injector {
             // Verifica configurazione minima (il code è sempre necessario)
             if ( empty( $rule['code'] ) ) {
                 continue;
+            }
+            
+            // Verifica dispositivo target
+            $device_target = $rule['device_target'] ?? 'both';
+            if ( $device_target === 'desktop' && $is_mobile ) {
+                continue; // Regola solo per desktop, ma siamo su mobile
+            }
+            if ( $device_target === 'mobile' && ! $is_mobile ) {
+                continue; // Regola solo per mobile, ma siamo su desktop
             }
             
             // Verifica match

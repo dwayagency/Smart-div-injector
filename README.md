@@ -28,6 +28,7 @@ Perfect for:
 
 ✅ **Unlimited Rules** - Create as many injection rules as you need  
 ✅ **Flexible Targeting** - Target all posts, category archives, posts by category, or specific pages  
+✅ **Device Targeting** - Choose desktop-only, mobile-only, or both devices for each rule  
 ✅ **Smart Injection Positions** - Standard positions (append, prepend, before, after, replace) + Article-specific positions  
 ✅ **Article-Specific Positions** - Before/after content, paragraphs, images - no CSS selector needed!  
 ✅ **Paragraph Targeting** - Insert before or after any specific paragraph number  
@@ -81,22 +82,30 @@ Give your rule a descriptive name (e.g., "Banner on News Articles", "Tracking on
 #### 2. Active Status
 Enable or disable the rule without deleting it. Inactive rules won't run on the frontend.
 
-#### 3. Content Type
+#### 3. Device Target
+Choose which devices should display this rule:
+- **Both** (📱💻) - Apply on both desktop and mobile devices (default)
+- **Desktop Only** (💻) - Apply only on desktop/laptop browsers
+- **Mobile Only** (📱) - Apply only on mobile devices and tablets
+
+> The plugin uses WordPress's `wp_is_mobile()` function to detect mobile devices.
+
+#### 4. Content Type
 Choose where to apply the injection:
 - **All Posts** (Tutti gli articoli) - Inject on all single post pages
 - **Category Archive Page** (Pagina archivio categoria) - Inject on the category archive page (e.g., example.com/category/news/)
 - **Posts by Category** (Articoli di una categoria) - Inject only on single posts that belong to a specific category
 - **Specific Page** (Pagina specifica) - Inject only on a selected page
 
-#### 4. Category (when applicable)
+#### 5. Category (when applicable)
 If you selected "Category Archive Page" or "Posts by Category", choose which category to target.
 
-#### 5. Page (when applicable)
+#### 6. Page (when applicable)
 If you selected "Specific Page", choose which page to target from the dropdown, or enter the Page ID manually.
 
 **For sites with many pages:** The dropdown shows up to 500 pages. If your page isn't listed, use the manual ID input field.
 
-#### 6. CSS Selector
+#### 7. CSS Selector
 Enter a valid CSS selector for the target element where the code will be injected.
 
 **Examples:**
@@ -105,7 +114,7 @@ Enter a valid CSS selector for the target element where the code will be injecte
 - `article > .entry-content` - Target with complex selectors
 - `main .wrap` - Target descendant elements
 
-#### 7. Injection Position
+#### 8. Injection Position
 
 **Standard Positions** (for CSS selectors):
 - **Append** - Insert at the end inside the element
@@ -125,7 +134,7 @@ Enter a valid CSS selector for the target element where the code will be injecte
 
 > **Note:** When using article-specific positions, the CSS selector field is not required and will be ignored.
 
-#### 8. Code to Inject
+#### 9. Code to Inject
 Enter the HTML/CSS/JavaScript code you want to inject. This field accepts any valid HTML markup.
 
 **Security Note:** Only users with `unfiltered_html` capability (typically administrators) can save scripts without sanitization.
@@ -260,6 +269,50 @@ Enter the HTML/CSS/JavaScript code you want to inject. This field accepts any va
 ```
 
 > Automatically inserts a CTA box before the first image in review posts.
+
+### Example 8: Mobile-Only Banner
+
+**Configuration:**
+- Rule Name: `Mobile Banner`
+- Active: ✓
+- Device Target: `📱 Mobile Only`
+- Content Type: `All Posts`
+- Position: `Before Content`
+- Code:
+```html
+<div class="mobile-app-banner" style="background: #4CAF50; color: white; padding: 15px; margin-bottom: 20px; border-radius: 5px; text-align: center;">
+    <strong>📱 Get Our Mobile App!</strong>
+    <p style="margin: 10px 0;">Download our app for a better reading experience</p>
+    <a href="#" style="background: white; color: #4CAF50; padding: 10px 20px; text-decoration: none; border-radius: 3px; display: inline-block; font-weight: bold;">
+        Download Now
+    </a>
+</div>
+```
+
+> This banner will only appear on mobile devices, promoting your mobile app.
+
+### Example 9: Desktop-Only Sidebar Widget
+
+**Configuration:**
+- Rule Name: `Desktop Sidebar Widget`
+- Active: ✓
+- Device Target: `💻 Desktop Only`
+- Content Type: `All Posts`
+- CSS Selector: `.sidebar`
+- Position: `Prepend`
+- Code:
+```html
+<div class="desktop-widget" style="background: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 5px;">
+    <h3 style="margin-top: 0;">Subscribe to Newsletter</h3>
+    <p>Get weekly updates delivered to your inbox</p>
+    <input type="email" placeholder="Your email" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 3px;">
+    <button style="width: 100%; padding: 10px; background: #2271b1; color: white; border: none; border-radius: 3px; cursor: pointer;">
+        Subscribe
+    </button>
+</div>
+```
+
+> This widget appears only on desktop, where there's more screen space for a sidebar.
 
 ## Developer Hooks
 
@@ -491,6 +544,12 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
   - Category Archive Page (category archive pages like /category/news/)
   - Posts by Category (single posts in a specific category)
   - Specific Page (individual pages)
+- **Device Targeting:**
+  - Desktop Only (💻) - Apply rules only on desktop/laptop browsers
+  - Mobile Only (📱) - Apply rules only on mobile devices and tablets
+  - Both (📱💻) - Apply rules on all devices (default)
+  - Uses WordPress `wp_is_mobile()` for device detection
+  - Perfect for showing different content on mobile vs desktop
 - **Article-Specific Injection Positions:**
   - Before Post - Insert before the entire post
   - Before Content - Insert at the start of the content
@@ -510,6 +569,7 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
   - Empty state design for better onboarding
   - Better spacing and typography
   - Dynamic form fields based on selection
+  - Device indicator in rules table
 - Memory optimization: Limits queries for sites with thousands of posts
 - Manual ID input for posts/pages not in dropdown
 - Added Author URI: https://dway.agency
