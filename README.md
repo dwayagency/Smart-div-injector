@@ -15,18 +15,24 @@ Smart Div Injector is a powerful WordPress plugin that allows you to create **un
 
 Perfect for:
 - Adding custom content to specific posts or categories
+- Injecting mid-article ads after specific paragraphs
+- Inserting CTAs before or after images
 - Injecting tracking scripts on targeted pages
 - Displaying special banners or notices conditionally
 - Inserting custom widgets or components dynamically
 - A/B testing different content variations
 - Creating multiple injection rules for different scenarios
+- Newsletter signup boxes in strategic positions
 
 ## Features
 
 ✅ **Unlimited Rules** - Create as many injection rules as you need  
 ✅ **Flexible Targeting** - Target all posts, category archives, posts by category, or specific pages  
-✅ **Multiple Injection Positions** - Append, prepend, before, after, or replace content  
-✅ **CSS Selector Support** - Use any valid CSS selector to target elements  
+✅ **Smart Injection Positions** - Standard positions (append, prepend, before, after, replace) + Article-specific positions  
+✅ **Article-Specific Positions** - Before/after content, paragraphs, images - no CSS selector needed!  
+✅ **Paragraph Targeting** - Insert before or after any specific paragraph number  
+✅ **Image Targeting** - Insert before or after the first image in posts  
+✅ **CSS Selector Support** - Use any valid CSS selector for standard positions  
 ✅ **Script Activation** - Automatically activates injected scripts  
 ✅ **Rule Management** - Add, edit, duplicate, and delete rules with ease  
 ✅ **Enable/Disable Rules** - Activate or deactivate rules without deleting them  
@@ -100,12 +106,24 @@ Enter a valid CSS selector for the target element where the code will be injecte
 - `main .wrap` - Target descendant elements
 
 #### 7. Injection Position
-Choose where to inject your code relative to the target element:
+
+**Standard Positions** (for CSS selectors):
 - **Append** - Insert at the end inside the element
 - **Prepend** - Insert at the beginning inside the element
 - **Before** - Insert before the element
 - **After** - Insert after the element
 - **Replace** - Replace the entire content of the element
+
+**Article-Specific Positions** (available for "All Posts" and "Posts by Category"):
+- **Before Post** - Insert before the entire post content
+- **Before Content** - Insert at the very beginning of the content
+- **After Content** - Insert at the very end of the content
+- **Before Paragraph N** - Insert before a specific paragraph (you specify the number)
+- **After Paragraph N** - Insert after a specific paragraph (you specify the number)
+- **Before First Image** - Insert before the first image in the content
+- **After First Image** - Insert after the first image in the content
+
+> **Note:** When using article-specific positions, the CSS selector field is not required and will be ignored.
 
 #### 8. Code to Inject
 Enter the HTML/CSS/JavaScript code you want to inject. This field accepts any valid HTML markup.
@@ -114,21 +132,22 @@ Enter the HTML/CSS/JavaScript code you want to inject. This field accepts any va
 
 ## Usage Examples
 
-### Example 1: Add a Banner to All Posts
+### Example 1: Add a Banner Before Post Content
 
 **Configuration:**
 - Rule Name: `Banner on All Articles`
 - Active: ✓
 - Content Type: `All Posts`
-- CSS Selector: `.entry-content`
-- Position: `Prepend`
+- Position: `Before Content`
 - Code:
 ```html
 <div class="custom-banner" style="background: #f0f0f0; padding: 20px; margin-bottom: 20px;">
     <h3>Special Announcement!</h3>
-    <p>This is a custom message for all articles.</p>
+    <p>This is a custom message shown before all article content.</p>
 </div>
 ```
+
+> This uses the article-specific "Before Content" position, so no CSS selector is needed.
 
 ### Example 2: Add Banner on Category Archive Page
 
@@ -199,6 +218,48 @@ Enter the HTML/CSS/JavaScript code you want to inject. This field accepts any va
     }
 </style>
 ```
+
+### Example 6: Inject Ad After 3rd Paragraph
+
+**Configuration:**
+- Rule Name: `Mid-Article Ad`
+- Active: ✓
+- Content Type: `All Posts`
+- Position: `After Paragraph N`
+- Paragraph Number: `3`
+- Code:
+```html
+<div class="mid-article-ad" style="margin: 30px 0; padding: 20px; background: #f9f9f9; text-align: center;">
+    <p style="font-size: 12px; color: #999; margin-bottom: 10px;">Advertisement</p>
+    <!-- Your ad code here -->
+    <div class="ad-placeholder" style="background: #ddd; height: 250px; display: flex; align-items: center; justify-content: center;">
+        Ad Space 300x250
+    </div>
+</div>
+```
+
+> This injects the ad after the 3rd paragraph of every post. No CSS selector needed!
+
+### Example 7: Call-to-Action Before First Image
+
+**Configuration:**
+- Rule Name: `CTA Before Image`
+- Active: ✓
+- Content Type: `Posts by Category`
+- Category: `Reviews`
+- Position: `Before First Image`
+- Code:
+```html
+<div class="cta-box" style="background: #2271b1; color: white; padding: 15px; margin: 20px 0; border-radius: 5px;">
+    <strong>📸 Before you see the image...</strong>
+    <p>Don't forget to subscribe to our newsletter for more reviews!</p>
+    <button style="background: white; color: #2271b1; border: none; padding: 10px 20px; border-radius: 3px; cursor: pointer;">
+        Subscribe Now
+    </button>
+</div>
+```
+
+> Automatically inserts a CTA box before the first image in review posts.
 
 ## Developer Hooks
 
@@ -430,6 +491,16 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
   - Category Archive Page (category archive pages like /category/news/)
   - Posts by Category (single posts in a specific category)
   - Specific Page (individual pages)
+- **Article-Specific Injection Positions:**
+  - Before Post - Insert before the entire post
+  - Before Content - Insert at the start of the content
+  - After Content - Insert at the end of the content
+  - Before Paragraph N - Insert before a specific paragraph
+  - After Paragraph N - Insert after a specific paragraph (great for mid-article ads!)
+  - Before First Image - Insert before the first image
+  - After First Image - Insert after the first image
+  - Smart paragraph and image detection using WordPress filters
+  - No CSS selector needed for article-specific positions
 - **Modern UI/UX:**
   - Custom CSS styling with beautiful color palette
   - Responsive design for mobile, tablet, and desktop
@@ -438,12 +509,14 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
   - Toggle switch for enable/disable rules
   - Empty state design for better onboarding
   - Better spacing and typography
+  - Dynamic form fields based on selection
 - Memory optimization: Limits queries for sites with thousands of posts
 - Manual ID input for posts/pages not in dropdown
 - Added Author URI: https://dway.agency
 - Complete UI/UX redesign for better usability
 - Updated filter hook parameters to include rule data and rule ID
 - Sequential rule processing with independent error handling
+- Server-side content injection for better performance on article positions
 
 ### 1.1.1
 - Fixed memory exhaustion on sites with many posts

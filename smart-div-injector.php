@@ -220,15 +220,22 @@ class Smart_Div_Injector {
      */
     private function sanitize_rule_data( $data ) {
         $valid_modes = [ 'single_posts', 'category_archive', 'single_posts_category', 'page' ];
+        $valid_positions = [ 
+            'append', 'prepend', 'before', 'after', 'replace',
+            'before_post', 'before_content', 'after_content',
+            'before_paragraph', 'after_paragraph',
+            'before_image', 'after_image'
+        ];
         
         $rule = [
-            'name'        => isset( $data['name'] ) ? sanitize_text_field( $data['name'] ) : 'Regola senza nome',
-            'active'      => isset( $data['active'] ) && $data['active'] === '1',
-            'match_mode'  => in_array( $data['match_mode'] ?? 'single_posts', $valid_modes, true ) ? $data['match_mode'] : 'single_posts',
-            'page_id'     => isset( $data['page_id'] ) ? absint( $data['page_id'] ) : 0,
-            'category_id' => isset( $data['category_id'] ) ? absint( $data['category_id'] ) : 0,
-            'selector'    => isset( $data['selector'] ) ? sanitize_text_field( $data['selector'] ) : '',
-            'position'    => in_array( $data['position'] ?? 'append', [ 'append', 'prepend', 'before', 'after', 'replace' ], true ) ? $data['position'] : 'append',
+            'name'              => isset( $data['name'] ) ? sanitize_text_field( $data['name'] ) : 'Regola senza nome',
+            'active'            => isset( $data['active'] ) && $data['active'] === '1',
+            'match_mode'        => in_array( $data['match_mode'] ?? 'single_posts', $valid_modes, true ) ? $data['match_mode'] : 'single_posts',
+            'page_id'           => isset( $data['page_id'] ) ? absint( $data['page_id'] ) : 0,
+            'category_id'       => isset( $data['category_id'] ) ? absint( $data['category_id'] ) : 0,
+            'selector'          => isset( $data['selector'] ) ? sanitize_text_field( $data['selector'] ) : '',
+            'position'          => in_array( $data['position'] ?? 'append', $valid_positions, true ) ? $data['position'] : 'append',
+            'paragraph_number'  => isset( $data['paragraph_number'] ) ? absint( $data['paragraph_number'] ) : 1,
         ];
         
         // Sanitizza il codice
@@ -419,14 +426,15 @@ class Smart_Div_Injector {
      */
     private function render_add_rule_page() {
         $rule = [
-            'name'        => '',
-            'active'      => true,
-            'match_mode'  => 'single_posts',
-            'page_id'     => 0,
-            'category_id' => 0,
-            'selector'    => '',
-            'position'    => 'append',
-            'code'        => ''
+            'name'             => '',
+            'active'           => true,
+            'match_mode'       => 'single_posts',
+            'page_id'          => 0,
+            'category_id'      => 0,
+            'selector'         => '',
+            'position'         => 'append',
+            'paragraph_number' => 1,
+            'code'             => ''
         ];
         
         $this->render_rule_form( $rule, 'add', null );
@@ -597,15 +605,43 @@ class Smart_Div_Injector {
                     </tr>
                     
                     <tr>
-                        <th scope="row"><label for="position">Posizione di inserimento</label></th>
+                        <th scope="row"><label for="position">Posizione di inserimento *</label></th>
                         <td>
-                            <select name="position" id="position">
-                                <option value="append" <?php selected( $rule['position'], 'append' ); ?>>Append (in fondo dentro la div)</option>
-                                <option value="prepend" <?php selected( $rule['position'], 'prepend' ); ?>>Prepend (all'inizio dentro la div)</option>
-                                <option value="before" <?php selected( $rule['position'], 'before' ); ?>>Prima della div</option>
-                                <option value="after" <?php selected( $rule['position'], 'after' ); ?>>Dopo la div</option>
-                                <option value="replace" <?php selected( $rule['position'], 'replace' ); ?>>Sostituisci contenuto della div</option>
+                            <select name="position" id="position" onchange="sdiTogglePositionFields()">
+                                <optgroup label="Posizioni Standard (per selettore CSS)">
+                                    <option value="append" <?php selected( $rule['position'], 'append' ); ?>>Append (in fondo dentro la div)</option>
+                                    <option value="prepend" <?php selected( $rule['position'], 'prepend' ); ?>>Prepend (all'inizio dentro la div)</option>
+                                    <option value="before" <?php selected( $rule['position'], 'before' ); ?>>Prima della div</option>
+                                    <option value="after" <?php selected( $rule['position'], 'after' ); ?>>Dopo la div</option>
+                                    <option value="replace" <?php selected( $rule['position'], 'replace' ); ?>>Sostituisci contenuto della div</option>
+                                </optgroup>
+                                <optgroup label="Posizioni per Articoli" id="article_positions" style="display: none;">
+                                    <option value="before_post" <?php selected( $rule['position'], 'before_post' ); ?>>Prima dell'articolo</option>
+                                    <option value="before_content" <?php selected( $rule['position'], 'before_content' ); ?>>Prima del contenuto</option>
+                                    <option value="after_content" <?php selected( $rule['position'], 'after_content' ); ?>>Dopo il contenuto</option>
+                                    <option value="before_paragraph" <?php selected( $rule['position'], 'before_paragraph' ); ?>>Prima del paragrafo N</option>
+                                    <option value="after_paragraph" <?php selected( $rule['position'], 'after_paragraph' ); ?>>Dopo il paragrafo N</option>
+                                    <option value="before_image" <?php selected( $rule['position'], 'before_image' ); ?>>Prima della prima immagine</option>
+                                    <option value="after_image" <?php selected( $rule['position'], 'after_image' ); ?>>Dopo la prima immagine</option>
+                                </optgroup>
                             </select>
+                            <p class="description">Scegli dove posizionare il codice</p>
+                        </td>
+                    </tr>
+                    
+                    <tr id="paragraph_number_row" style="display: none;">
+                        <th scope="row"><label for="paragraph_number">Numero del Paragrafo</label></th>
+                        <td>
+                            <input type="number" name="paragraph_number" id="paragraph_number" value="<?php echo esc_attr( $rule['paragraph_number'] ?? 1 ); ?>" min="1" max="50" style="width: 100px;">
+                            <p class="description">Specifica quale paragrafo (1 = primo paragrafo, 2 = secondo, ecc.)</p>
+                        </td>
+                    </tr>
+                    
+                    <tr id="selector_note_row">
+                        <td colspan="2">
+                            <div class="sdi-notice info" style="margin: 0;">
+                                <p><strong>ℹ️ Nota sul Selettore CSS:</strong> Il selettore è necessario per le posizioni standard. Per le posizioni specifiche degli articoli, il selettore viene ignorato.</p>
+                            </div>
                         </td>
                     </tr>
                     
@@ -636,10 +672,17 @@ class Smart_Div_Injector {
             var mode = document.getElementById('match_mode').value;
             var pageRow = document.getElementById('page_row');
             var categoryRow = document.getElementById('category_row');
+            var articlePositions = document.getElementById('article_positions');
             
             // Nascondi tutto
             if (pageRow) pageRow.style.display = 'none';
             if (categoryRow) categoryRow.style.display = 'none';
+            
+            // Mostra/nascondi posizioni articoli in base al tipo
+            var isArticleMode = (mode === 'single_posts' || mode === 'single_posts_category');
+            if (articlePositions) {
+                articlePositions.style.display = isArticleMode ? '' : 'none';
+            }
             
             // Mostra in base alla selezione
             switch(mode) {
@@ -655,6 +698,40 @@ class Smart_Div_Injector {
                 case 'page':
                     if (pageRow) pageRow.style.display = 'table-row';
                     break;
+            }
+            
+            // Aggiorna anche la visibilità dei campi posizione
+            sdiTogglePositionFields();
+        }
+        
+        function sdiTogglePositionFields() {
+            var position = document.getElementById('position').value;
+            var paragraphRow = document.getElementById('paragraph_number_row');
+            var selectorRow = document.getElementById('selector').closest('tr');
+            var selectorNoteRow = document.getElementById('selector_note_row');
+            
+            // Posizioni che richiedono il numero del paragrafo
+            var needsParagraphNumber = (position === 'before_paragraph' || position === 'after_paragraph');
+            if (paragraphRow) {
+                paragraphRow.style.display = needsParagraphNumber ? 'table-row' : 'none';
+            }
+            
+            // Posizioni specifiche articoli non usano il selettore CSS
+            var articlePositions = ['before_post', 'before_content', 'after_content', 'before_paragraph', 'after_paragraph', 'before_image', 'after_image'];
+            var usesSelector = !articlePositions.includes(position);
+            
+            if (selectorRow) {
+                if (usesSelector) {
+                    selectorRow.style.display = 'table-row';
+                    document.getElementById('selector').required = true;
+                } else {
+                    selectorRow.style.display = 'none';
+                    document.getElementById('selector').required = false;
+                }
+            }
+            
+            if (selectorNoteRow) {
+                selectorNoteRow.style.display = usesSelector ? 'none' : 'table-row';
             }
         }
         
@@ -697,9 +774,13 @@ class Smart_Div_Injector {
         
         // Esegui al caricamento
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', sdiToggleFields);
+            document.addEventListener('DOMContentLoaded', function() {
+                sdiToggleFields();
+                sdiTogglePositionFields();
+            });
         } else {
             sdiToggleFields();
+            sdiTogglePositionFields();
         }
         </script>
         <?php
@@ -806,7 +887,7 @@ class Smart_Div_Injector {
         $is_single_post = is_single();
         $is_page = is_page();
         
-        // Array per raccogliere tutti i payload da iniettare
+        // Array per raccogliere tutti i payload da iniettare via JS
         $payloads = [];
         
         // Itera su ogni regola
@@ -816,8 +897,8 @@ class Smart_Div_Injector {
                 continue;
             }
             
-            // Verifica configurazione minima
-            if ( empty( $rule['selector'] ) || empty( $rule['code'] ) ) {
+            // Verifica configurazione minima (il code è sempre necessario)
+            if ( empty( $rule['code'] ) ) {
                 continue;
             }
             
@@ -852,36 +933,191 @@ class Smart_Div_Injector {
                     break;
             }
             
-            // Se match, aggiungi il payload
+            // Se match, processa la regola
             if ( $match ) {
-                $payload = [
-                    'selector' => $rule['selector'],
-                    'position' => $rule['position'],
-                    'code'     => $rule['code'],
-                ];
+                $position = $rule['position'];
+                $article_positions = [ 'before_post', 'before_content', 'after_content', 'before_paragraph', 'after_paragraph', 'before_image', 'after_image' ];
                 
-                /**
-                 * Filtra il payload prima dell'iniezione
-                 * 
-                 * @param array $payload Array con selector, position e code
-                 * @param array $rule La regola completa
-                 * @param string $rule_id ID della regola
-                 */
-                $payload = apply_filters( 'sdi_injection_payload', $payload, $rule, $rule_id );
-                
-                // Verifica che il payload sia ancora valido dopo il filtro
-                if ( ! empty( $payload['selector'] ) && ! empty( $payload['code'] ) ) {
-                    $payloads[] = $payload;
+                // Le posizioni specifiche articoli usano filtri WordPress
+                if ( in_array( $position, $article_positions, true ) ) {
+                    add_filter( 'the_content', function( $content ) use ( $rule ) {
+                        return $this->inject_in_content( $content, $rule );
+                    }, 10 );
+                } else {
+                    // Le posizioni standard usano JavaScript
+                    if ( empty( $rule['selector'] ) ) {
+                        continue; // Selector necessario per posizioni standard
+                    }
+                    
+                    $payload = [
+                        'selector' => $rule['selector'],
+                        'position' => $rule['position'],
+                        'code'     => $rule['code'],
+                    ];
+                    
+                    /**
+                     * Filtra il payload prima dell'iniezione
+                     * 
+                     * @param array $payload Array con selector, position e code
+                     * @param array $rule La regola completa
+                     * @param string $rule_id ID della regola
+                     */
+                    $payload = apply_filters( 'sdi_injection_payload', $payload, $rule, $rule_id );
+                    
+                    // Verifica che il payload sia ancora valido dopo il filtro
+                    if ( ! empty( $payload['selector'] ) && ! empty( $payload['code'] ) ) {
+                        $payloads[] = $payload;
+                    }
                 }
             }
         }
         
-        // Se ci sono payload da iniettare, registra lo script
+        // Se ci sono payload da iniettare via JS, registra lo script
         if ( ! empty( $payloads ) ) {
             wp_register_script( 'sdi-runtime', false, [], false, true );
             wp_enqueue_script( 'sdi-runtime' );
             wp_add_inline_script( 'sdi-runtime', $this->get_inline_js( $payloads ) );
         }
+    }
+    
+    /**
+     * Inietta il codice nel contenuto dell'articolo
+     */
+    private function inject_in_content( $content, $rule ) {
+        $code = $rule['code'];
+        $position = $rule['position'];
+        $paragraph_number = isset( $rule['paragraph_number'] ) ? absint( $rule['paragraph_number'] ) : 1;
+        
+        switch ( $position ) {
+            case 'before_post':
+                // Prima dell'intero contenuto (equivale a before_content ma con priorità diversa)
+                return $code . $content;
+                
+            case 'before_content':
+                // Prima del contenuto
+                return $code . $content;
+                
+            case 'after_content':
+                // Dopo il contenuto
+                return $content . $code;
+                
+            case 'before_paragraph':
+                // Prima del paragrafo N
+                return $this->inject_before_paragraph( $content, $code, $paragraph_number );
+                
+            case 'after_paragraph':
+                // Dopo il paragrafo N
+                return $this->inject_after_paragraph( $content, $code, $paragraph_number );
+                
+            case 'before_image':
+                // Prima della prima immagine
+                return $this->inject_before_image( $content, $code );
+                
+            case 'after_image':
+                // Dopo la prima immagine
+                return $this->inject_after_image( $content, $code );
+                
+            default:
+                return $content;
+        }
+    }
+    
+    /**
+     * Inietta codice prima del paragrafo N
+     */
+    private function inject_before_paragraph( $content, $code, $paragraph_number ) {
+        // Trova tutti i paragrafi <p>
+        $paragraphs = preg_split( '/(<p[^>]*>.*?<\/p>)/is', $content, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY );
+        
+        $p_count = 0;
+        $result = '';
+        
+        foreach ( $paragraphs as $paragraph ) {
+            // Se è un paragrafo (inizia con <p)
+            if ( preg_match( '/^<p[^>]*>/i', $paragraph ) ) {
+                $p_count++;
+                
+                // Se è il paragrafo target, inietta prima
+                if ( $p_count === $paragraph_number ) {
+                    $result .= $code . $paragraph;
+                } else {
+                    $result .= $paragraph;
+                }
+            } else {
+                $result .= $paragraph;
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Inietta codice dopo il paragrafo N
+     */
+    private function inject_after_paragraph( $content, $code, $paragraph_number ) {
+        // Trova tutti i paragrafi <p>
+        $paragraphs = preg_split( '/(<p[^>]*>.*?<\/p>)/is', $content, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY );
+        
+        $p_count = 0;
+        $result = '';
+        
+        foreach ( $paragraphs as $paragraph ) {
+            // Se è un paragrafo (inizia con <p)
+            if ( preg_match( '/^<p[^>]*>/i', $paragraph ) ) {
+                $p_count++;
+                
+                // Se è il paragrafo target, inietta dopo
+                if ( $p_count === $paragraph_number ) {
+                    $result .= $paragraph . $code;
+                } else {
+                    $result .= $paragraph;
+                }
+            } else {
+                $result .= $paragraph;
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Inietta codice prima della prima immagine
+     */
+    private function inject_before_image( $content, $code ) {
+        // Cerca il primo tag <img>
+        $pattern = '/(<img[^>]*>)/i';
+        
+        if ( preg_match( $pattern, $content, $matches, PREG_OFFSET_CAPTURE ) ) {
+            $img_position = $matches[0][1];
+            $before = substr( $content, 0, $img_position );
+            $after = substr( $content, $img_position );
+            
+            return $before . $code . $after;
+        }
+        
+        // Se non trova immagini, non inietta nulla
+        return $content;
+    }
+    
+    /**
+     * Inietta codice dopo la prima immagine
+     */
+    private function inject_after_image( $content, $code ) {
+        // Cerca il primo tag <img>
+        $pattern = '/(<img[^>]*>)/i';
+        
+        if ( preg_match( $pattern, $content, $matches, PREG_OFFSET_CAPTURE ) ) {
+            $img_tag = $matches[0][0];
+            $img_end_position = $matches[0][1] + strlen( $img_tag );
+            
+            $before = substr( $content, 0, $img_end_position );
+            $after = substr( $content, $img_end_position );
+            
+            return $before . $code . $after;
+        }
+        
+        // Se non trova immagini, non inietta nulla
+        return $content;
     }
 
     private function get_inline_js( array $payloads ): string {
