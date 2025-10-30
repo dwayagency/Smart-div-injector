@@ -238,115 +238,43 @@ class Smart_Div_Injector {
         );
     }
 
-    public function register_settings() {
-        register_setting( 'sdi_group', self::OPTION_KEY, [ $this, 'sanitize_options' ] );
-
-        add_settings_section(
-            'sdi_main',
-            'Regole di inserimento',
-            function () {
-                echo '<p>Configura quando e dove inserire il codice. Il plugin inserirà automaticamente il tuo codice HTML/JS/CSS nella posizione specificata quando le condizioni sono soddisfatte.</p>';
-                echo '<p><strong>Note:</strong></p>';
-                echo '<ul style="list-style: disc; padding-left: 20px;">';
-                echo '<li>Il selettore CSS deve essere valido (es. <code>#my-div</code>, <code>.my-class</code>, <code>main > article</code>)</li>';
-                echo '<li>Il codice viene inserito dopo il caricamento del DOM</li>';
-                echo '<li>Gli script inseriti vengono automaticamente attivati</li>';
-                echo '</ul>';
-            },
-            'smart-div-injector'
-        );
-
-        add_settings_field( 'match_mode', 'Tipo di contenuto', [ $this, 'field_match_mode' ], 'smart-div-injector', 'sdi_main' );
-        add_settings_field( 'page_id', 'Pagina specifica', [ $this, 'field_page_id' ], 'smart-div-injector', 'sdi_main' );
-        add_settings_field( 'category_id', 'Categoria', [ $this, 'field_category' ], 'smart-div-injector', 'sdi_main' );
-        add_settings_field( 'selector', 'Selettore CSS della div', [ $this, 'field_selector' ], 'smart-div-injector', 'sdi_main' );
-        add_settings_field( 'position', 'Posizione di inserimento', [ $this, 'field_position' ], 'smart-div-injector', 'sdi_main' );
-        add_settings_field( 'code', 'Codice da inserire', [ $this, 'field_code' ], 'smart-div-injector', 'sdi_main' );
-    }
-
-    public function get_options() {
-        $defaults = [
-            'match_mode'  => 'single_posts', // single_posts|single_posts_category|page
-            'page_id'     => 0,
-            'category_id' => 0,
-            'selector'    => '',
-            'position'    => 'append', // append|prepend|before|after|replace
-            'code'        => '',
-        ];
-        $opts = get_option( self::OPTION_KEY, [] );
-        return wp_parse_args( $opts, $defaults );
-    }
-
-    public function sanitize_options( $input ) {
-        $output = $this->get_options();
-
-        // Valida match_mode
-        $valid_modes = [ 'single_posts', 'single_posts_category', 'page' ];
-        $output['match_mode'] = in_array( $input['match_mode'] ?? 'single_posts', $valid_modes, true ) ? $input['match_mode'] : 'single_posts';
-        
-        // Sanitizza page_id
-        $output['page_id'] = isset( $input['page_id'] ) ? absint( $input['page_id'] ) : 0;
-        
-        // Sanitizza category_id
-        $output['category_id'] = isset( $input['category_id'] ) ? absint( $input['category_id'] ) : 0;
-        
-        $output['selector'] = isset( $input['selector'] ) ? sanitize_text_field( $input['selector'] ) : '';
-        $output['position'] = in_array( $input['position'] ?? 'append', [ 'append', 'prepend', 'before', 'after', 'replace' ], true ) ? $input['position'] : 'append';
-
-        // Permetti codice non filtrato solo a chi ha la capability unfiltered_html.
-        if ( current_user_can( 'unfiltered_html' ) ) {
-            $output['code'] = $input['code'] ?? '';
-        } else {
-            // Fallback: sanitizza per sicurezza (script verranno rimossi per ruoli senza capability).
-            $output['code'] = wp_kses_post( $input['code'] ?? '' );
-        }
-
-        return $output;
-    }
-
+    /**
+     * Render della pagina principale (lista regole o edit regola)
+     */
     public function render_settings_page() {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
         
-        $opts = $this->get_options();
+        // Determina quale vista mostrare
+        if ( isset( $_GET['action'] ) && $_GET['action'] === 'edit' && isset( $_GET['rule_id'] ) ) {
+            $this->render_edit_rule_page( $_GET['rule_id'] );
+        } elseif ( isset( $_GET['action'] ) && $_GET['action'] === 'add' ) {
+            $this->render_add_rule_page();
+        } else {
+            $this->render_rules_list_page();
+        }
+    }
+    
+    /**
+     * Render della lista delle regole
+     */
+    private function render_rules_list_page() {
+        $rules = $this->get_rules();
         
-        // Mostra avvisi se la configurazione è incompleta
-        $warnings = [];
-        if ( empty( $opts['selector'] ) ) {
-            $warnings[] = 'Selettore CSS non impostato';
-        }
-        if ( empty( $opts['code'] ) ) {
-            $warnings[] = 'Codice da inserire non impostato';
-        }
-        
-        // Validazione basata sul tipo di contenuto
-        switch ( $opts['match_mode'] ) {
-            case 'single_posts':
-                // Nessuna validazione richiesta - applica a tutti gli articoli
-                break;
-                
-            case 'single_posts_category':
-                if ( ! $opts['category_id'] ) {
-                    $warnings[] = 'Categoria non selezionata (richiesta per mostrare solo su articoli di una categoria)';
-                }
-                break;
-                
-            case 'page':
-                if ( ! $opts['page_id'] ) {
-                    $warnings[] = 'Pagina non selezionata (richiesta per la modalità selezionata)';
-                }
-                break;
-        }
+        // Messaggi di conferma
+        $message = isset( $_GET['message'] ) ? $_GET['message'] : '';
         
         ?>
         <div class="wrap">
-            <h1>Smart Div Injector</h1>
+            <h1 class="wp-heading-inline">Smart Div Injector</h1>
+            <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector&action=add' ) ); ?>" class="page-title-action">Aggiungi nuova regola</a>
+            <hr class="wp-header-end">
             
             <?php if ( is_multisite() ) : ?>
                 <div class="notice notice-info">
                     <p>
-                        <strong>Multisite:</strong> Stai configurando il plugin per questo sito specifico.
+                        <strong>Multisite:</strong> Stai configurando le regole per questo sito specifico.
                         <?php if ( current_user_can( 'manage_network_options' ) ) : ?>
                             Puoi vedere lo stato di tutti i siti dalla <a href="<?php echo esc_url( network_admin_url( 'admin.php?page=smart-div-injector-network' ) ); ?>">pagina Network Admin</a>.
                         <?php endif; ?>
@@ -354,22 +282,93 @@ class Smart_Div_Injector {
                 </div>
             <?php endif; ?>
             
-            <?php if ( ! empty( $warnings ) ) : ?>
-                <div class="notice notice-warning">
-                    <p><strong>Attenzione:</strong> La configurazione è incompleta. Il plugin non verrà attivato fino a quando non completerai:</p>
-                    <ul style="list-style: disc; padding-left: 20px;">
-                        <?php foreach ( $warnings as $warning ) : ?>
-                            <li><?php echo esc_html( $warning ); ?></li>
-                        <?php endforeach; ?>
-                    </ul>
+            <?php if ( $message === 'added' ) : ?>
+                <div class="notice notice-success is-dismissible">
+                    <p><strong>Regola aggiunta con successo!</strong></p>
+                </div>
+            <?php elseif ( $message === 'updated' ) : ?>
+                <div class="notice notice-success is-dismissible">
+                    <p><strong>Regola aggiornata con successo!</strong></p>
+                </div>
+            <?php elseif ( $message === 'deleted' ) : ?>
+                <div class="notice notice-success is-dismissible">
+                    <p><strong>Regola eliminata con successo!</strong></p>
+                </div>
+            <?php elseif ( $message === 'duplicated' ) : ?>
+                <div class="notice notice-success is-dismissible">
+                    <p><strong>Regola duplicata con successo!</strong></p>
                 </div>
             <?php endif; ?>
             
-            <form method="post" action="options.php">
-                <?php settings_fields( 'sdi_group' ); ?>
-                <?php do_settings_sections( 'smart-div-injector' ); ?>
-                <?php submit_button(); ?>
-            </form>
+            <?php if ( empty( $rules ) ) : ?>
+                <div class="notice notice-info">
+                    <p><strong>Nessuna regola configurata.</strong> Clicca su "Aggiungi nuova regola" per iniziare.</p>
+                </div>
+            <?php else : ?>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th scope="col" style="width: 50px;">Attiva</th>
+                            <th scope="col">Nome</th>
+                            <th scope="col">Tipo</th>
+                            <th scope="col">Target</th>
+                            <th scope="col">Selettore</th>
+                            <th scope="col" style="width: 150px;">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ( $rules as $rule_id => $rule ) : ?>
+                            <tr>
+                                <td>
+                                    <?php if ( $rule['active'] ) : ?>
+                                        <span class="dashicons dashicons-yes-alt" style="color: green;" title="Attiva"></span>
+                                    <?php else : ?>
+                                        <span class="dashicons dashicons-dismiss" style="color: #999;" title="Non attiva"></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><strong><?php echo esc_html( $rule['name'] ); ?></strong></td>
+                                <td>
+                                    <?php 
+                                    switch ( $rule['match_mode'] ) {
+                                        case 'single_posts':
+                                            echo 'Tutti gli articoli';
+                                            break;
+                                        case 'single_posts_category':
+                                            echo 'Articoli per categoria';
+                                            break;
+                                        case 'page':
+                                            echo 'Pagina specifica';
+                                            break;
+                                    }
+                                    ?>
+                                </td>
+                                <td>
+                                    <?php 
+                                    if ( $rule['match_mode'] === 'single_posts_category' && $rule['category_id'] ) {
+                                        $cat = get_category( $rule['category_id'] );
+                                        echo $cat ? esc_html( $cat->name ) : 'Categoria #' . $rule['category_id'];
+                                    } elseif ( $rule['match_mode'] === 'page' && $rule['page_id'] ) {
+                                        echo get_the_title( $rule['page_id'] ) ?: 'Pagina #' . $rule['page_id'];
+                                    } else {
+                                        echo '—';
+                                    }
+                                    ?>
+                                </td>
+                                <td><code><?php echo esc_html( $rule['selector'] ); ?></code></td>
+                                <td>
+                                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector&action=edit&rule_id=' . $rule_id ) ); ?>" class="button button-small">Modifica</a>
+                                    <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=duplicate&rule_id=' . $rule_id ), 'duplicate_rule_' . $rule_id ) ); ?>" class="button button-small">Duplica</a>
+                                    <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=delete&rule_id=' . $rule_id ), 'delete_rule_' . $rule_id ) ); ?>" class="button button-small button-link-delete" onclick="return confirm('Sei sicuro di voler eliminare questa regola?');">Elimina</a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+            
+            <p class="description" style="margin-top: 20px;">
+                <strong>Come funziona:</strong> Ogni regola definisce dove e come inserire il codice. Le regole attive vengono applicate automaticamente sul frontend quando le condizioni sono soddisfatte.
+            </p>
         </div>
         <?php
     }
