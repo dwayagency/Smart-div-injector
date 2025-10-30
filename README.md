@@ -1,10 +1,12 @@
 # Smart Div Injector
 
-**Version:** 1.0.1  
+**Version:** 1.0.2  
 **Author:** DWAY SRL  
 **License:** GPL-2.0+  
 **Requires at least:** WordPress 5.0  
+**Requires PHP:** 7.2  
 **Tested up to:** WordPress 6.4  
+**Network:** Compatible with WordPress Multisite  
 
 ## Description
 
@@ -26,6 +28,7 @@ Perfect for:
 ✅ **Security First** - Respects WordPress capabilities for unfiltered HTML  
 ✅ **Developer Friendly** - Includes filters for customization  
 ✅ **User-Friendly Interface** - Clear admin panel with validation warnings  
+✅ **Multisite Ready** - Full support for WordPress Multisite with Network Admin panel  
 
 ## Installation
 
@@ -207,6 +210,76 @@ The injected JavaScript uses modern web standards but is compatible with:
 - Edge (latest)
 - All browsers supporting ES5+
 
+## Multisite Support
+
+This plugin is **fully compatible with WordPress Multisite** installations.
+
+### How It Works in Multisite
+
+- **Site-Specific Settings**: Each site in your network has its own independent configuration
+- **Separate Database Tables**: Settings are stored in each site's options table
+- **Network Admin Panel**: Super admins can view all sites and their configuration status
+- **Flexible Activation**: Can be activated network-wide or per-site
+
+### Network Admin Features
+
+When activated on a multisite network, the plugin adds a **Network Admin** page accessible only to super administrators.
+
+**Features of the Network Admin page:**
+- View all sites in the network at a glance
+- See which sites have the plugin configured
+- Quick links to access each site's settings
+- Visual indicators showing configuration status
+
+### Configuration in Multisite
+
+1. **Network Activation** (Optional):
+   - Go to `Network Admin > Plugins`
+   - Network activate the plugin to make it available to all sites
+
+2. **Per-Site Configuration**:
+   - Switch to the specific site you want to configure
+   - Go to `Smart Div Injector` in the site's admin menu
+   - Configure settings for that specific site
+
+3. **Network Admin Overview**:
+   - As a super admin, access `Network Admin > Smart Div Injector`
+   - View the status of all sites
+   - Click "Vai alle impostazioni" (Go to settings) to configure individual sites
+
+### Multisite Use Cases
+
+**Example 1: Different Injection Per Site**
+- Site 1 (English): Inject tracking code for English users
+- Site 2 (Spanish): Inject localized content for Spanish users
+- Site 3 (French): Inject different banner for French market
+
+**Example 2: Conditional Activation**
+- Main site: No injection
+- Blog subsites: Add custom widgets
+- Store subsites: Add product recommendations
+
+**Example 3: Network-Wide Campaign**
+- Configure the same banner across all sites
+- Each site maintains its own configuration
+- Easy to update individually or in bulk
+
+### Technical Details for Multisite
+
+- Uses `switch_to_blog()` and `restore_current_blog()` for safe site switching
+- Respects site-specific capabilities (`manage_options` per site)
+- Network admins have `manage_network_options` capability
+- No conflicts between sites
+- Database queries are optimized for network operations
+
+### Multisite Best Practices
+
+1. **Test on One Site First**: Before rolling out to all sites, test on a single site
+2. **Document Your Settings**: Keep track of what each site has configured
+3. **Use Network Admin**: Regularly check the Network Admin page for overview
+4. **Consistent Selectors**: If using across multiple sites, ensure CSS selectors exist on all sites
+5. **Staging Environment**: Test multisite configurations in staging before production
+
 ## Troubleshooting
 
 ### Code is not being injected
@@ -234,6 +307,23 @@ The injected JavaScript uses modern web standards but is compatible with:
 3. Check if the element is dynamically loaded after page load
 4. Try a more specific or less specific selector
 
+### Multisite Issues
+
+**Plugin not appearing in Network Admin:**
+1. Make sure you're logged in as a super administrator
+2. Verify the plugin is network activated or activated on at least one site
+3. Clear browser cache and reload
+
+**Configuration not saving on specific site:**
+1. Switch to that specific site's admin panel
+2. Ensure you have `manage_options` capability on that site
+3. Check if the site's database is accessible
+
+**Different behavior across sites:**
+- This is expected! Each site has independent configuration
+- Verify CSS selectors exist on all sites where you want injection
+- Check that themes are compatible across sites
+
 ## Performance
 
 - **Minimal footprint** - Only loads on pages that match your conditions
@@ -243,6 +333,17 @@ The injected JavaScript uses modern web standards but is compatible with:
 
 ## Changelog
 
+### 1.0.2
+- **WordPress Multisite Support**: Full compatibility with WordPress Multisite installations
+- Added Network Admin page for super administrators
+- Site-specific configuration for each site in the network
+- Network overview showing all sites and their configuration status
+- Added multisite detection and warnings in admin interface
+- Added `is_network_activated()` helper method
+- Enhanced documentation with multisite section
+- Added `Network: true` to plugin header
+- Added PHP 7.2+ requirement in header
+
 ### 1.0.1
 - Fixed HTML validation issue in category select
 - Improved post_id field handling (empty vs 0)
@@ -251,6 +352,7 @@ The injected JavaScript uses modern web standards but is compatible with:
 - Added developer filter hook `sdi_injection_payload`
 - Enhanced documentation and code comments
 - Fixed wp_register_script handle parameter
+- Removed ID display from category dropdown (cleaner UI)
 
 ### 1.0.0
 - Initial release
