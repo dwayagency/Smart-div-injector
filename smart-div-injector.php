@@ -1164,80 +1164,127 @@ class Smart_Div_Injector {
     }
 
     private function get_inline_js( array $payloads ): string {
-        $json = wp_json_encode( $payloads );
+        // Escape JSON correttamente per l'uso in script inline
+        $json = wp_json_encode( 
+            $payloads, 
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES 
+        );
         
         // JavaScript inline formattato per leggibilità
         $js = <<<JS
 (function(){
-  var rules = {$json};
-  
-  function ready(fn){ 
-    if(document.readyState !== 'loading'){ 
-      fn(); 
-    } else { 
-      document.addEventListener('DOMContentLoaded', fn); 
-    } 
-  }
-  
-  function insert(target, html, where){
-    if(!target) return;
+  try {
+    var rules = {$json};
     
-    var container = document.createElement('div');
-    container.innerHTML = html;
-
-    function activateScripts(scope){
-      var scripts = scope.querySelectorAll('script');
-      scripts.forEach(function(oldScript){
-        var newScript = document.createElement('script');
-        for (var i = 0; i < oldScript.attributes.length; i++) {
-          var attr = oldScript.attributes[i];
-          newScript.setAttribute(attr.name, attr.value);
-        }
-        newScript.text = oldScript.text;
-        oldScript.parentNode.replaceChild(newScript, oldScript);
-      });
+    function ready(fn){ 
+      if(document.readyState !== 'loading'){ 
+        fn(); 
+      } else { 
+        document.addEventListener('DOMContentLoaded', fn); 
+      } 
     }
+    
+    function insert(target, html, where){
+      if(!target) return;
+      
+      var container = document.createElement('div');
+      container.innerHTML = html;
 
-    switch(where){
-      case 'prepend':
-        target.insertAdjacentElement('afterbegin', container);
-        activateScripts(container);
-        break;
-      case 'before':
-        target.insertAdjacentElement('beforebegin', container);
-        activateScripts(container);
-        break;
-      case 'after':
-        target.insertAdjacentElement('afterend', container);
-        activateScripts(container);
-        break;
-      case 'replace':
-        target.innerHTML = '';
-        target.appendChild(container);
-        activateScripts(container);
-        break;
-      case 'append':
-      default:
-        target.appendChild(container);
-        activateScripts(container);
-    }
-  }
-  
-  ready(function(){
-    // Processa ogni regola
-    rules.forEach(function(rule, index){
-      try {
-        var el = document.querySelector(rule.selector);
-        if(!el){ 
-          console.warn('Smart Div Injector: Selettore non trovato:', rule.selector);
-          return; 
-        }
-        insert(el, rule.code, rule.position || 'append');
-      } catch(e) { 
-        console.warn('Smart Div Injector: Errore nell\'iniezione della regola #' + (index + 1), e); 
+      function activateScripts(scope){
+        var scripts = scope.querySelectorAll('script');
+        scripts.forEach(function(oldScript){
+          try {
+            var newScript = document.createElement('script');
+            
+            // Copia attributi
+            for (var i = 0; i < oldScript.attributes.length; i++) {
+              var attr = oldScript.attributes[i];
+              try {
+                newScript.setAttribute(attr.name, attr.value);
+              } catch(attrError) {
+                console.warn('Smart Div Injector: Errore nel copiare attributo:', attr.name, attrError);
+              }
+            }
+            
+            // Copia il contenuto dello script
+            try {
+              if (oldScript.textContent) {
+                newScript.textContent = oldScript.textContent;
+              } else if (oldScript.text) {
+                newScript.text = oldScript.text;
+              }
+            } catch(textError) {
+              console.warn('Smart Div Injector: Errore nel copiare il contenuto dello script:', textError);
+            }
+            
+            // Sostituisci il vecchio script con il nuovo
+            if (oldScript.parentNode) {
+              oldScript.parentNode.replaceChild(newScript, oldScript);
+            }
+          } catch(scriptError) {
+            console.warn('Smart Div Injector: Errore nell\'attivazione dello script:', scriptError);
+          }
+        });
       }
+
+      try {
+        switch(where){
+          case 'prepend':
+            target.insertAdjacentElement('afterbegin', container);
+            activateScripts(container);
+            break;
+          case 'before':
+            target.insertAdjacentElement('beforebegin', container);
+            activateScripts(container);
+            break;
+          case 'after':
+            target.insertAdjacentElement('afterend', container);
+            activateScripts(container);
+            break;
+          case 'replace':
+            target.innerHTML = '';
+            target.appendChild(container);
+            activateScripts(container);
+            break;
+          case 'append':
+          default:
+            target.appendChild(container);
+            activateScripts(container);
+        }
+      } catch(insertError) {
+        console.warn('Smart Div Injector: Errore nell\'inserimento:', insertError);
+      }
+    }
+    
+    ready(function(){
+      if (!rules || !Array.isArray(rules)) {
+        console.warn('Smart Div Injector: Nessuna regola valida da processare');
+        return;
+      }
+      
+      // Processa ogni regola
+      rules.forEach(function(rule, index){
+        try {
+          if (!rule || !rule.selector || !rule.code) {
+            console.warn('Smart Div Injector: Regola #' + (index + 1) + ' non valida');
+            return;
+          }
+          
+          var el = document.querySelector(rule.selector);
+          if(!el){ 
+            console.warn('Smart Div Injector: Selettore non trovato:', rule.selector);
+            return; 
+          }
+          
+          insert(el, rule.code, rule.position || 'append');
+        } catch(e) { 
+          console.warn('Smart Div Injector: Errore nell\'iniezione della regola #' + (index + 1), e); 
+        }
+      });
     });
-  });
+  } catch(globalError) {
+    console.error('Smart Div Injector: Errore critico:', globalError);
+  }
 })();
 JS;
         
