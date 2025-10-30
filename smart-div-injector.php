@@ -1,9 +1,10 @@
 <?php
 /**
  * Plugin Name: Smart Div Injector
- * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria.
- * Version: 1.1.1
+ * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple.
+ * Version: 2.0.0
  * Author: DWAY SRL
+ * Author URI: https://dway.agency
  * License: GPL-2.0+
  * Text Domain: smart-div-injector
  * Network: true
@@ -16,12 +17,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Smart_Div_Injector {
-    const OPTION_KEY = 'sdi_options';
+    const OPTION_KEY = 'sdi_rules'; // Cambiato da sdi_options a sdi_rules (array di regole)
 
     public function __construct() {
         // Admin
         add_action( 'admin_menu', [ $this, 'add_settings_page' ] );
-        add_action( 'admin_init', [ $this, 'register_settings' ] );
+        add_action( 'admin_init', [ $this, 'handle_actions' ] );
 
         // Multisite: aggiungi menu anche nel Network Admin (opzionale)
         if ( is_multisite() ) {
@@ -30,6 +31,36 @@ class Smart_Div_Injector {
 
         // Frontend
         add_action( 'wp_enqueue_scripts', [ $this, 'maybe_enqueue_frontend' ] );
+    }
+    
+    /**
+     * Ottieni tutte le regole salvate
+     */
+    public function get_rules() {
+        $rules = get_option( self::OPTION_KEY, [] );
+        return is_array( $rules ) ? $rules : [];
+    }
+    
+    /**
+     * Salva tutte le regole
+     */
+    public function save_rules( $rules ) {
+        update_option( self::OPTION_KEY, $rules );
+    }
+    
+    /**
+     * Ottieni una singola regola per ID
+     */
+    public function get_rule( $rule_id ) {
+        $rules = $this->get_rules();
+        return isset( $rules[ $rule_id ] ) ? $rules[ $rule_id ] : null;
+    }
+    
+    /**
+     * Genera un nuovo ID univoco per una regola
+     */
+    private function generate_rule_id() {
+        return 'rule_' . time() . '_' . wp_rand( 1000, 9999 );
     }
     
     /**
@@ -58,6 +89,138 @@ class Smart_Div_Injector {
             'dashicons-code-standards',        // Icon
             65                                  // Position (after Plugins)
         );
+    }
+    
+    /**
+     * Gestisce le azioni (aggiungi, modifica, elimina regole)
+     */
+    public function handle_actions() {
+        if ( ! isset( $_GET['page'] ) || $_GET['page'] !== 'smart-div-injector' ) {
+            return;
+        }
+        
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        
+        // Verifica nonce per sicurezza
+        if ( isset( $_POST['sdi_action'] ) && ! isset( $_POST['sdi_nonce'] ) ) {
+            return;
+        }
+        
+        if ( isset( $_POST['sdi_nonce'] ) && ! wp_verify_nonce( $_POST['sdi_nonce'], 'sdi_rule_action' ) ) {
+            wp_die( 'Nonce verification failed' );
+        }
+        
+        // Aggiungi nuova regola
+        if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'add' ) {
+            $this->save_rule_from_post();
+            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=added' ) );
+            exit;
+        }
+        
+        // Modifica regola esistente
+        if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'edit' && isset( $_POST['rule_id'] ) ) {
+            $this->update_rule_from_post( $_POST['rule_id'] );
+            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=updated' ) );
+            exit;
+        }
+        
+        // Elimina regola
+        if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' && isset( $_GET['rule_id'] ) ) {
+            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'delete_rule_' . $_GET['rule_id'] ) ) {
+                wp_die( 'Nonce verification failed' );
+            }
+            $this->delete_rule( $_GET['rule_id'] );
+            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=deleted' ) );
+            exit;
+        }
+        
+        // Duplica regola
+        if ( isset( $_GET['action'] ) && $_GET['action'] === 'duplicate' && isset( $_GET['rule_id'] ) ) {
+            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'duplicate_rule_' . $_GET['rule_id'] ) ) {
+                wp_die( 'Nonce verification failed' );
+            }
+            $this->duplicate_rule( $_GET['rule_id'] );
+            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=duplicated' ) );
+            exit;
+        }
+    }
+    
+    /**
+     * Salva una nuova regola dai dati POST
+     */
+    private function save_rule_from_post() {
+        $rule = $this->sanitize_rule_data( $_POST );
+        $rule_id = $this->generate_rule_id();
+        
+        $rules = $this->get_rules();
+        $rules[ $rule_id ] = $rule;
+        $this->save_rules( $rules );
+    }
+    
+    /**
+     * Aggiorna una regola esistente
+     */
+    private function update_rule_from_post( $rule_id ) {
+        $rule = $this->sanitize_rule_data( $_POST );
+        
+        $rules = $this->get_rules();
+        if ( isset( $rules[ $rule_id ] ) ) {
+            $rules[ $rule_id ] = $rule;
+            $this->save_rules( $rules );
+        }
+    }
+    
+    /**
+     * Elimina una regola
+     */
+    private function delete_rule( $rule_id ) {
+        $rules = $this->get_rules();
+        if ( isset( $rules[ $rule_id ] ) ) {
+            unset( $rules[ $rule_id ] );
+            $this->save_rules( $rules );
+        }
+    }
+    
+    /**
+     * Duplica una regola
+     */
+    private function duplicate_rule( $rule_id ) {
+        $rules = $this->get_rules();
+        if ( isset( $rules[ $rule_id ] ) ) {
+            $new_rule = $rules[ $rule_id ];
+            $new_rule['name'] = $new_rule['name'] . ' (copia)';
+            $new_rule_id = $this->generate_rule_id();
+            $rules[ $new_rule_id ] = $new_rule;
+            $this->save_rules( $rules );
+        }
+    }
+    
+    /**
+     * Sanitizza i dati della regola
+     */
+    private function sanitize_rule_data( $data ) {
+        $valid_modes = [ 'single_posts', 'single_posts_category', 'page' ];
+        
+        $rule = [
+            'name'        => isset( $data['name'] ) ? sanitize_text_field( $data['name'] ) : 'Regola senza nome',
+            'active'      => isset( $data['active'] ) && $data['active'] === '1',
+            'match_mode'  => in_array( $data['match_mode'] ?? 'single_posts', $valid_modes, true ) ? $data['match_mode'] : 'single_posts',
+            'page_id'     => isset( $data['page_id'] ) ? absint( $data['page_id'] ) : 0,
+            'category_id' => isset( $data['category_id'] ) ? absint( $data['category_id'] ) : 0,
+            'selector'    => isset( $data['selector'] ) ? sanitize_text_field( $data['selector'] ) : '',
+            'position'    => in_array( $data['position'] ?? 'append', [ 'append', 'prepend', 'before', 'after', 'replace' ], true ) ? $data['position'] : 'append',
+        ];
+        
+        // Sanitizza il codice
+        if ( current_user_can( 'unfiltered_html' ) ) {
+            $rule['code'] = $data['code'] ?? '';
+        } else {
+            $rule['code'] = wp_kses_post( $data['code'] ?? '' );
+        }
+        
+        return $rule;
     }
     
     /**
@@ -93,8 +256,7 @@ class Smart_Div_Injector {
             'smart-div-injector'
         );
 
-        add_settings_field( 'match_mode', 'Tipo di contenuto target', [ $this, 'field_match_mode' ], 'smart-div-injector', 'sdi_main' );
-        add_settings_field( 'post_id', 'Articolo specifico', [ $this, 'field_post_id' ], 'smart-div-injector', 'sdi_main' );
+        add_settings_field( 'match_mode', 'Tipo di contenuto', [ $this, 'field_match_mode' ], 'smart-div-injector', 'sdi_main' );
         add_settings_field( 'page_id', 'Pagina specifica', [ $this, 'field_page_id' ], 'smart-div-injector', 'sdi_main' );
         add_settings_field( 'category_id', 'Categoria', [ $this, 'field_category' ], 'smart-div-injector', 'sdi_main' );
         add_settings_field( 'selector', 'Selettore CSS della div', [ $this, 'field_selector' ], 'smart-div-injector', 'sdi_main' );
@@ -104,8 +266,7 @@ class Smart_Div_Injector {
 
     public function get_options() {
         $defaults = [
-            'match_mode'  => 'post', // post|page|category|post_category|page_category
-            'post_id'     => 0,
+            'match_mode'  => 'single_posts', // single_posts|single_posts_category|page
             'page_id'     => 0,
             'category_id' => 0,
             'selector'    => '',
@@ -120,11 +281,8 @@ class Smart_Div_Injector {
         $output = $this->get_options();
 
         // Valida match_mode
-        $valid_modes = [ 'post', 'page', 'category', 'post_category', 'page_category' ];
-        $output['match_mode'] = in_array( $input['match_mode'] ?? 'post', $valid_modes, true ) ? $input['match_mode'] : 'post';
-        
-        // Sanitizza post_id
-        $output['post_id'] = isset( $input['post_id'] ) ? absint( $input['post_id'] ) : 0;
+        $valid_modes = [ 'single_posts', 'single_posts_category', 'page' ];
+        $output['match_mode'] = in_array( $input['match_mode'] ?? 'single_posts', $valid_modes, true ) ? $input['match_mode'] : 'single_posts';
         
         // Sanitizza page_id
         $output['page_id'] = isset( $input['page_id'] ) ? absint( $input['page_id'] ) : 0;
@@ -164,29 +322,19 @@ class Smart_Div_Injector {
         
         // Validazione basata sul tipo di contenuto
         switch ( $opts['match_mode'] ) {
-            case 'post':
-                if ( ! $opts['post_id'] ) {
-                    $warnings[] = 'Articolo non selezionato (richiesto per la modalità selezionata)';
+            case 'single_posts':
+                // Nessuna validazione richiesta - applica a tutti gli articoli
+                break;
+                
+            case 'single_posts_category':
+                if ( ! $opts['category_id'] ) {
+                    $warnings[] = 'Categoria non selezionata (richiesta per mostrare solo su articoli di una categoria)';
                 }
                 break;
+                
             case 'page':
                 if ( ! $opts['page_id'] ) {
                     $warnings[] = 'Pagina non selezionata (richiesta per la modalità selezionata)';
-                }
-                break;
-            case 'category':
-                if ( ! $opts['category_id'] ) {
-                    $warnings[] = 'Categoria non selezionata (richiesta per la modalità selezionata)';
-                }
-                break;
-            case 'post_category':
-                if ( ! $opts['post_id'] || ! $opts['category_id'] ) {
-                    $warnings[] = 'Articolo e categoria devono essere entrambi selezionati (richiesti per la modalità AND)';
-                }
-                break;
-            case 'page_category':
-                if ( ! $opts['page_id'] || ! $opts['category_id'] ) {
-                    $warnings[] = 'Pagina e categoria devono essere entrambe selezionate (richieste per la modalità AND)';
                 }
                 break;
         }
@@ -312,49 +460,36 @@ class Smart_Div_Injector {
         $opts = $this->get_options();
         ?>
         <select name="<?php echo esc_attr( self::OPTION_KEY ); ?>[match_mode]" id="sdi_match_mode" onchange="sdiToggleFields()">
-            <option value="post" <?php selected( $opts['match_mode'], 'post' ); ?>>Articolo specifico</option>
+            <option value="single_posts" <?php selected( $opts['match_mode'], 'single_posts' ); ?>>Tutti gli articoli</option>
+            <option value="single_posts_category" <?php selected( $opts['match_mode'], 'single_posts_category' ); ?>>Articoli di una categoria</option>
             <option value="page" <?php selected( $opts['match_mode'], 'page' ); ?>>Pagina specifica</option>
-            <option value="category" <?php selected( $opts['match_mode'], 'category' ); ?>>Categoria</option>
-            <option value="post_category" <?php selected( $opts['match_mode'], 'post_category' ); ?>>Articolo E Categoria (AND)</option>
-            <option value="page_category" <?php selected( $opts['match_mode'], 'page_category' ); ?>>Pagina E Categoria (AND)</option>
         </select>
-        <p class="description">Scegli il tipo di contenuto su cui attivare l'iniezione del codice.</p>
+        <p class="description">Scegli dove attivare l'iniezione del codice.</p>
         
         <script>
         function sdiToggleFields() {
             var mode = document.getElementById('sdi_match_mode').value;
-            var postDiv = document.getElementById('sdi_post_row');
             var pageDiv = document.getElementById('sdi_page_row');
             var categoryDiv = document.getElementById('sdi_category_row');
             
             // Trova le righe <tr> parent
-            var postRow = postDiv ? postDiv.closest('tr') : null;
             var pageRow = pageDiv ? pageDiv.closest('tr') : null;
             var categoryRow = categoryDiv ? categoryDiv.closest('tr') : null;
             
             // Nascondi tutte le righe
-            if (postRow) postRow.style.display = 'none';
             if (pageRow) pageRow.style.display = 'none';
             if (categoryRow) categoryRow.style.display = 'none';
             
             // Mostra in base alla selezione
             switch(mode) {
-                case 'post':
-                    if (postRow) postRow.style.display = 'table-row';
+                case 'single_posts':
+                    // Nessun campo aggiuntivo
+                    break;
+                case 'single_posts_category':
+                    if (categoryRow) categoryRow.style.display = 'table-row';
                     break;
                 case 'page':
                     if (pageRow) pageRow.style.display = 'table-row';
-                    break;
-                case 'category':
-                    if (categoryRow) categoryRow.style.display = 'table-row';
-                    break;
-                case 'post_category':
-                    if (postRow) postRow.style.display = 'table-row';
-                    if (categoryRow) categoryRow.style.display = 'table-row';
-                    break;
-                case 'page_category':
-                    if (pageRow) pageRow.style.display = 'table-row';
-                    if (categoryRow) categoryRow.style.display = 'table-row';
                     break;
             }
         }
@@ -369,99 +504,6 @@ class Smart_Div_Injector {
         <?php
     }
 
-    public function field_post_id() {
-        $opts = $this->get_options();
-        
-        // Limita il numero di post per evitare problemi di memoria
-        $post_count = wp_count_posts( 'post' );
-        $total_posts = isset( $post_count->publish ) ? $post_count->publish : 0;
-        $limit = 500; // Carica max 500 articoli
-        
-        $posts = get_posts( [ 
-            'numberposts' => $limit,
-            'post_status' => 'publish',
-            'orderby'     => 'date',
-            'order'       => 'DESC',
-            'fields'      => 'ids' // Carica solo gli ID per risparmiare memoria
-        ] );
-        
-        ?>
-        <div id="sdi_post_row">
-            <?php if ( $total_posts > $limit ) : ?>
-                <p class="description" style="color: #d63638; font-weight: 600;">
-                    ⚠️ Il tuo sito ha <?php echo number_format( $total_posts ); ?> articoli. Il dropdown mostra solo gli ultimi <?php echo $limit; ?>.
-                    <br>Se non trovi l'articolo, usa il campo ID manuale qui sotto.
-                </p>
-            <?php endif; ?>
-            
-            <select name="<?php echo esc_attr( self::OPTION_KEY ); ?>[post_id]" id="sdi_post_select" class="regular-text" style="margin-bottom: 10px;">
-                <option value="0">— Seleziona un articolo dal dropdown —</option>
-                <?php foreach ( $posts as $post_id ) : 
-                    $post_title = get_the_title( $post_id );
-                    if ( empty( $post_title ) ) {
-                        $post_title = '(Nessun titolo)';
-                    }
-                ?>
-                    <option value="<?php echo esc_attr( $post_id ); ?>" <?php selected( $opts['post_id'], $post_id ); ?>>
-                        <?php echo esc_html( $post_title . ' (ID: ' . $post_id . ')' ); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            
-            <div style="margin-top: 10px;">
-                <label>
-                    <strong>Oppure inserisci l'ID manualmente:</strong><br>
-                    <input type="number" 
-                           id="sdi_post_manual" 
-                           min="1" 
-                           value="<?php echo esc_attr( $opts['post_id'] > 0 ? $opts['post_id'] : '' ); ?>" 
-                           placeholder="Esempio: 123" 
-                           style="width: 200px;" />
-                    <button type="button" class="button" onclick="sdiSetPostFromManual()">Usa questo ID</button>
-                </label>
-            </div>
-            
-            <p class="description">Seleziona un articolo dal dropdown oppure inserisci l'ID manualmente.</p>
-            
-            <script>
-            function sdiSetPostFromManual() {
-                var manualInput = document.getElementById('sdi_post_manual');
-                var select = document.getElementById('sdi_post_select');
-                var manualValue = manualInput.value;
-                
-                if (manualValue && manualValue > 0) {
-                    // Verifica se l'opzione esiste già nel select
-                    var optionExists = false;
-                    for (var i = 0; i < select.options.length; i++) {
-                        if (select.options[i].value == manualValue) {
-                            select.selectedIndex = i;
-                            optionExists = true;
-                            break;
-                        }
-                    }
-                    
-                    // Se non esiste, aggiungi l'opzione
-                    if (!optionExists) {
-                        var option = document.createElement('option');
-                        option.value = manualValue;
-                        option.text = 'ID: ' + manualValue + ' (inserito manualmente)';
-                        option.selected = true;
-                        select.add(option);
-                    }
-                    
-                    alert('ID articolo impostato: ' + manualValue);
-                }
-            }
-            
-            // Sincronizza campo manuale quando si cambia il select
-            document.getElementById('sdi_post_select').addEventListener('change', function() {
-                document.getElementById('sdi_post_manual').value = this.value > 0 ? this.value : '';
-            });
-            </script>
-        </div>
-        <?php
-    }
-    
     public function field_page_id() {
         $opts = $this->get_options();
         

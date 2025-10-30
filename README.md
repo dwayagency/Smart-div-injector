@@ -1,7 +1,8 @@
 # Smart Div Injector
 
-**Version:** 1.0.2  
+**Version:** 2.0.0  
 **Author:** DWAY SRL  
+**Author URI:** https://dway.agency  
 **License:** GPL-2.0+  
 **Requires at least:** WordPress 5.0  
 **Requires PHP:** 7.2  
@@ -10,7 +11,7 @@
 
 ## Description
 
-Smart Div Injector is a powerful WordPress plugin that allows you to inject custom HTML, CSS, or JavaScript code into specific div elements on your website based on post ID and/or category conditions.
+Smart Div Injector is a powerful WordPress plugin that allows you to create **unlimited injection rules** to insert custom HTML, CSS, or JavaScript code into specific div elements on your website based on content type (posts, pages, categories).
 
 Perfect for:
 - Adding custom content to specific posts or categories
@@ -18,16 +19,21 @@ Perfect for:
 - Displaying special banners or notices conditionally
 - Inserting custom widgets or components dynamically
 - A/B testing different content variations
+- Creating multiple injection rules for different scenarios
 
 ## Features
 
-✅ **Flexible Targeting** - Target by post ID, category, or both  
+✅ **Unlimited Rules** - Create as many injection rules as you need  
+✅ **Flexible Targeting** - Target all posts, posts by category, or specific pages  
 ✅ **Multiple Injection Positions** - Append, prepend, before, after, or replace content  
 ✅ **CSS Selector Support** - Use any valid CSS selector to target elements  
 ✅ **Script Activation** - Automatically activates injected scripts  
+✅ **Rule Management** - Add, edit, duplicate, and delete rules with ease  
+✅ **Enable/Disable Rules** - Activate or deactivate rules without deleting them  
 ✅ **Security First** - Respects WordPress capabilities for unfiltered HTML  
 ✅ **Developer Friendly** - Includes filters for customization  
 ✅ **User-Friendly Interface** - Clear admin panel with validation warnings  
+✅ **Memory Optimized** - Handles sites with thousands of posts efficiently  
 ✅ **Multisite Ready** - Full support for WordPress Multisite with Network Admin panel  
 
 ## Installation
@@ -48,25 +54,40 @@ Perfect for:
 
 ## Configuration
 
-Navigate to **Settings > Smart Div Injector** in your WordPress admin panel.
+Navigate to **Smart Div Injector** in your WordPress admin menu (main sidebar).
 
-### Settings Overview
+### How It Works
 
-#### 1. Activation Condition
-Choose when the code injection should be triggered:
-- **Post ID Only** - Inject only on a specific post/page
-- **Category Only** - Inject on all posts in a specific category
-- **Post ID AND Category** - Inject only when both conditions are met
+The plugin uses a **rules-based system**. You can create multiple injection rules, each with its own configuration:
 
-#### 2. Post ID
-Enter the ID of the post or page where you want to inject the code. Leave empty if not using this condition.
+1. **Create a Rule** - Click "Add New Rule" button
+2. **Configure the Rule** - Set up targeting, selector, and code
+3. **Save the Rule** - Click "Save Rule"
+4. **Manage Rules** - View all rules in the main list, edit, duplicate, or delete as needed
 
-**Tip:** You can find the post ID in the URL when editing a post (e.g., `post.php?post=123`)
+### Rule Settings
 
-#### 3. Category
-Select the category where you want to inject the code. Choose "None" if not using this condition.
+#### 1. Rule Name
+Give your rule a descriptive name (e.g., "Banner on News Articles", "Tracking on Homepage")
 
-#### 4. CSS Selector
+#### 2. Active Status
+Enable or disable the rule without deleting it. Inactive rules won't run on the frontend.
+
+#### 3. Content Type
+Choose where to apply the injection:
+- **All Posts** (Tutti gli articoli) - Inject on all single post pages
+- **Posts by Category** (Articoli di una categoria) - Inject only on posts in a specific category
+- **Specific Page** (Pagina specifica) - Inject only on a selected page
+
+#### 4. Category (when applicable)
+If you selected "Posts by Category", choose which category to target.
+
+#### 5. Page (when applicable)
+If you selected "Specific Page", choose which page to target from the dropdown, or enter the Page ID manually.
+
+**For sites with many pages:** The dropdown shows up to 500 pages. If your page isn't listed, use the manual ID input field.
+
+#### 6. CSS Selector
 Enter a valid CSS selector for the target element where the code will be injected.
 
 **Examples:**
@@ -75,7 +96,7 @@ Enter a valid CSS selector for the target element where the code will be injecte
 - `article > .entry-content` - Target with complex selectors
 - `main .wrap` - Target descendant elements
 
-#### 5. Injection Position
+#### 7. Injection Position
 Choose where to inject your code relative to the target element:
 - **Append** - Insert at the end inside the element
 - **Prepend** - Insert at the beginning inside the element
@@ -83,7 +104,7 @@ Choose where to inject your code relative to the target element:
 - **After** - Insert after the element
 - **Replace** - Replace the entire content of the element
 
-#### 6. Code to Inject
+#### 8. Code to Inject
 Enter the HTML/CSS/JavaScript code you want to inject. This field accepts any valid HTML markup.
 
 **Security Note:** Only users with `unfiltered_html` capability (typically administrators) can save scripts without sanitization.
@@ -333,6 +354,33 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 
 ## Changelog
 
+### 2.0.0
+- **🎉 Major Update: Multiple Rules System**
+- Create unlimited injection rules instead of single configuration
+- Add, edit, duplicate, and delete rules individually
+- Enable/disable rules without deleting them
+- New rule management interface with list view
+- Each rule has a name for easy identification
+- Simplified targeting: All posts, Posts by category, or Specific page
+- Memory optimization: Limits queries for sites with thousands of posts
+- Manual ID input for posts/pages not in dropdown
+- Added Author URI: https://dway.agency
+- Complete UI/UX redesign for better usability
+
+### 1.1.1
+- Fixed memory exhaustion on sites with many posts
+- Limited post/page queries to 500 items max
+- Added manual ID input field as alternative to dropdown
+- Memory-efficient queries using 'fields' => 'ids'
+- Warning messages when limits are reached
+
+### 1.1.0
+- Redesigned content type selection
+- Separate fields for posts, pages, and categories
+- Dropdown selection for posts and pages
+- Dynamic field visibility based on selection
+- Removed complex post_id handling
+
 ### 1.0.2
 - **WordPress Multisite Support**: Full compatibility with WordPress Multisite installations
 - Added Network Admin page for super administrators
@@ -365,11 +413,13 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 
 For support, feature requests, or bug reports, please contact DWAY SRL.
 
+**Website:** https://dway.agency
+
 ## License
 
 This plugin is licensed under GPL-2.0+. You are free to use, modify, and distribute this plugin under the terms of the GPL license.
 
 ---
 
-**Made with ❤️ by DWAY SRL**
+**Made with ❤️ by [DWAY SRL](https://dway.agency)**
 
