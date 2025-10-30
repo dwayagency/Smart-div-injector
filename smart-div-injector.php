@@ -242,9 +242,36 @@ class Smart_Div_Injector {
         
         // Sanitizza il codice
         if ( current_user_can( 'unfiltered_html' ) ) {
+            // Gli amministratori possono inserire qualsiasi codice
             $rule['code'] = $data['code'] ?? '';
         } else {
-            $rule['code'] = wp_kses_post( $data['code'] ?? '' );
+            // Per altri utenti, usa una whitelist permissiva ma sicura
+            $allowed_html = wp_kses_allowed_html( 'post' );
+            
+            // Aggiungi tag e attributi necessari per gli script
+            $allowed_html['script'] = [
+                'src'           => true,
+                'type'          => true,
+                'async'         => true,
+                'defer'         => true,
+                'crossorigin'   => true,
+                'integrity'     => true,
+                'charset'       => true,
+                'id'            => true,
+                'class'         => true,
+            ];
+            $allowed_html['iframe'] = [
+                'src'           => true,
+                'width'         => true,
+                'height'        => true,
+                'frameborder'   => true,
+                'allowfullscreen' => true,
+                'style'         => true,
+                'id'            => true,
+                'class'         => true,
+            ];
+            
+            $rule['code'] = wp_kses( $data['code'] ?? '', $allowed_html );
         }
         
         return $rule;
@@ -1262,13 +1289,25 @@ class Smart_Div_Injector {
       if (element.tagName === 'SCRIPT') {
         var script = document.createElement('script');
         
-        // Copia tutti gli attributi
+        // Copia tutti gli attributi in modo sicuro
         Array.from(element.attributes).forEach(function(attr) {
-          script.setAttribute(attr.name, attr.value);
+          try {
+            // Usa getAttribute per ottenere il valore non processato
+            var value = element.getAttribute(attr.name);
+            if (value !== null) {
+              script.setAttribute(attr.name, value);
+            }
+          } catch(e) {
+            console.warn('Smart Div Injector: Errore nel copiare attributo', attr.name, e);
+          }
         });
         
-        // Copia il contenuto
-        script.textContent = element.textContent;
+        // Copia il contenuto dello script
+        if (element.textContent) {
+          script.textContent = element.textContent;
+        } else if (element.text) {
+          script.text = element.text;
+        }
         
         return script;
       }
@@ -1313,6 +1352,9 @@ class Smart_Div_Injector {
           var decodedCode = decodeURIComponent(atob(rule.code).split('').map(function(c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
           }).join(''));
+          
+          // Debug: mostra il codice decodificato nella console
+          console.log('Smart Div Injector: Codice decodificato per regola #' + (index + 1) + ':', decodedCode);
           
           insert(el, decodedCode, rule.position || 'append');
         } catch(e) { 
