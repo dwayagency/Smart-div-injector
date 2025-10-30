@@ -26,12 +26,14 @@ class Smart_Div_Injector {
 
     /** -------------------- ADMIN -------------------- */
     public function add_settings_page() {
-        add_options_page(
-            'Smart Div Injector',
-            'Smart Div Injector',
-            'manage_options',
-            'smart-div-injector',
-            [ $this, 'render_settings_page' ]
+        add_menu_page(
+            'Smart Div Injector',              // Page title
+            'Smart Div Injector',              // Menu title
+            'manage_options',                   // Capability
+            'smart-div-injector',              // Menu slug
+            [ $this, 'render_settings_page' ], // Callback function
+            'dashicons-code-standards',        // Icon
+            65                                  // Position (after Plugins)
         );
     }
 
