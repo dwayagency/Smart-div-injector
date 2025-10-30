@@ -1017,9 +1017,21 @@ class Smart_Div_Injector {
         
         // Se ci sono payload da iniettare via JS, registra lo script
         if ( ! empty( $payloads ) ) {
+            // Codifica il codice HTML in base64 per evitare problemi di escaping
+            $encoded_payloads = array_map( function( $payload ) {
+                return [
+                    'selector' => $payload['selector'],
+                    'position' => $payload['position'],
+                    'code'     => base64_encode( $payload['code'] ), // Codifica in base64
+                ];
+            }, $payloads );
+            
             wp_register_script( 'sdi-runtime', false, [], false, true );
             wp_enqueue_script( 'sdi-runtime' );
-            wp_add_inline_script( 'sdi-runtime', $this->get_inline_js( $payloads ) );
+            
+            // Passa i dati codificati
+            wp_localize_script( 'sdi-runtime', 'sdiPayloads', $encoded_payloads );
+            wp_add_inline_script( 'sdi-runtime', $this->get_inline_js() );
         }
     }
     
@@ -1163,18 +1175,14 @@ class Smart_Div_Injector {
         return $content;
     }
 
-    private function get_inline_js( array $payloads ): string {
-        // Escape JSON correttamente per l'uso in script inline
-        $json = wp_json_encode( 
-            $payloads, 
-            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES 
-        );
-        
+    private function get_inline_js(): string {
+        // I payload vengono passati tramite wp_localize_script come variabile globale sdiPayloads
         // JavaScript inline formattato per leggibilità
-        $js = <<<JS
+        $js = <<<'JS'
 (function(){
   try {
-    var rules = {$json};
+    // I dati sono passati da wp_localize_script nella variabile globale sdiPayloads
+    var rules = window.sdiPayloads || [];
     
     function ready(fn){ 
       if(document.readyState !== 'loading'){ 
@@ -1187,73 +1195,98 @@ class Smart_Div_Injector {
     function insert(target, html, where){
       if(!target) return;
       
-      var container = document.createElement('div');
-      container.innerHTML = html;
-
-      function activateScripts(scope){
-        var scripts = scope.querySelectorAll('script');
-        scripts.forEach(function(oldScript){
-          try {
-            var newScript = document.createElement('script');
-            
-            // Copia attributi
-            for (var i = 0; i < oldScript.attributes.length; i++) {
-              var attr = oldScript.attributes[i];
-              try {
-                newScript.setAttribute(attr.name, attr.value);
-              } catch(attrError) {
-                console.warn('Smart Div Injector: Errore nel copiare attributo:', attr.name, attrError);
-              }
-            }
-            
-            // Copia il contenuto dello script
-            try {
-              if (oldScript.textContent) {
-                newScript.textContent = oldScript.textContent;
-              } else if (oldScript.text) {
-                newScript.text = oldScript.text;
-              }
-            } catch(textError) {
-              console.warn('Smart Div Injector: Errore nel copiare il contenuto dello script:', textError);
-            }
-            
-            // Sostituisci il vecchio script con il nuovo
-            if (oldScript.parentNode) {
-              oldScript.parentNode.replaceChild(newScript, oldScript);
-            }
-          } catch(scriptError) {
-            console.warn('Smart Div Injector: Errore nell\'attivazione dello script:', scriptError);
-          }
-        });
-      }
-
+      // Crea un contenitore temporaneo
+      var temp = document.createElement('div');
+      temp.innerHTML = html;
+      
+      // Estrae tutti gli elementi (non solo gli script)
+      var elements = Array.from(temp.childNodes);
+      
       try {
+        // Inserisci gli elementi nella posizione corretta
         switch(where){
           case 'prepend':
-            target.insertAdjacentElement('afterbegin', container);
-            activateScripts(container);
+            elements.reverse().forEach(function(el) {
+              if (el.nodeType === 1) { // Element node
+                target.insertBefore(cloneAndExecute(el), target.firstChild);
+              } else {
+                target.insertBefore(el.cloneNode(true), target.firstChild);
+              }
+            });
             break;
           case 'before':
-            target.insertAdjacentElement('beforebegin', container);
-            activateScripts(container);
+            elements.forEach(function(el) {
+              if (el.nodeType === 1) {
+                target.parentNode.insertBefore(cloneAndExecute(el), target);
+              } else {
+                target.parentNode.insertBefore(el.cloneNode(true), target);
+              }
+            });
             break;
           case 'after':
-            target.insertAdjacentElement('afterend', container);
-            activateScripts(container);
+            elements.reverse().forEach(function(el) {
+              if (el.nodeType === 1) {
+                target.parentNode.insertBefore(cloneAndExecute(el), target.nextSibling);
+              } else {
+                target.parentNode.insertBefore(el.cloneNode(true), target.nextSibling);
+              }
+            });
             break;
           case 'replace':
             target.innerHTML = '';
-            target.appendChild(container);
-            activateScripts(container);
+            elements.forEach(function(el) {
+              if (el.nodeType === 1) {
+                target.appendChild(cloneAndExecute(el));
+              } else {
+                target.appendChild(el.cloneNode(true));
+              }
+            });
             break;
           case 'append':
           default:
-            target.appendChild(container);
-            activateScripts(container);
+            elements.forEach(function(el) {
+              if (el.nodeType === 1) {
+                target.appendChild(cloneAndExecute(el));
+              } else {
+                target.appendChild(el.cloneNode(true));
+              }
+            });
         }
       } catch(insertError) {
         console.warn('Smart Div Injector: Errore nell\'inserimento:', insertError);
       }
+    }
+    
+    function cloneAndExecute(element) {
+      // Se è uno script, crea una copia eseguibile
+      if (element.tagName === 'SCRIPT') {
+        var script = document.createElement('script');
+        
+        // Copia tutti gli attributi
+        Array.from(element.attributes).forEach(function(attr) {
+          script.setAttribute(attr.name, attr.value);
+        });
+        
+        // Copia il contenuto
+        script.textContent = element.textContent;
+        
+        return script;
+      }
+      
+      // Per altri elementi, clona e processa ricorsivamente gli script al loro interno
+      var clone = element.cloneNode(false);
+      
+      Array.from(element.childNodes).forEach(function(child) {
+        if (child.nodeType === 1 && child.tagName === 'SCRIPT') {
+          clone.appendChild(cloneAndExecute(child));
+        } else if (child.nodeType === 1) {
+          clone.appendChild(cloneAndExecute(child));
+        } else {
+          clone.appendChild(child.cloneNode(true));
+        }
+      });
+      
+      return clone;
     }
     
     ready(function(){
@@ -1276,7 +1309,12 @@ class Smart_Div_Injector {
             return; 
           }
           
-          insert(el, rule.code, rule.position || 'append');
+          // Decodifica il codice da base64
+          var decodedCode = decodeURIComponent(atob(rule.code).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+          
+          insert(el, decodedCode, rule.position || 'append');
         } catch(e) { 
           console.warn('Smart Div Injector: Errore nell\'iniezione della regola #' + (index + 1), e); 
         }
