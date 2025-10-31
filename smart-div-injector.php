@@ -472,7 +472,7 @@ class Smart_Div_Injector {
         </div>
         <?php
     }
-    
+
     /**
      * Render pagina aggiungi nuova regola
      */
@@ -508,7 +508,7 @@ class Smart_Div_Injector {
                 </div>
                 <p><a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector' ) ); ?>" class="button">Torna alla lista regole</a></p>
             </div>
-            <?php
+        <?php
             return;
         }
         
@@ -596,12 +596,12 @@ class Smart_Div_Injector {
                             ?>
                             <select name="category_id" id="category_id" class="regular-text">
                                 <option value="0">— Seleziona una categoria —</option>
-                                <?php foreach ( $categories as $cat ) : ?>
+            <?php foreach ( $categories as $cat ) : ?>
                                     <option value="<?php echo esc_attr( $cat->term_id ); ?>" <?php selected( $rule['category_id'], $cat->term_id ); ?>>
                                         <?php echo esc_html( $cat->name ); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
+                </option>
+            <?php endforeach; ?>
+        </select>
                             <p class="description">Seleziona la categoria target per gli articoli</p>
                         </td>
                     </tr>
@@ -609,7 +609,7 @@ class Smart_Div_Injector {
                     <tr id="page_row" style="display: none;">
                         <th scope="row"><label for="page_id">Pagina</label></th>
                         <td>
-                            <?php
+        <?php
                             $page_count = wp_count_posts( 'page' );
                             $total_pages = isset( $page_count->publish ) ? $page_count->publish : 0;
                             $limit = 500;
@@ -861,7 +861,7 @@ class Smart_Div_Injector {
         </script>
         <?php
     }
-    
+
     /**
      * Pagina impostazioni per Network Admin (multisite)
      */
@@ -989,8 +989,8 @@ class Smart_Div_Injector {
             }
             
             // Verifica match
-            $match = false;
-            
+        $match = false;
+
             switch ( $rule['match_mode'] ) {
                 case 'single_posts':
                     // Tutti gli articoli
@@ -1245,58 +1245,64 @@ class Smart_Div_Injector {
       // Estrae tutti gli elementi (non solo gli script)
       var elements = Array.from(temp.childNodes);
       
+      // Inserisci gli elementi in modo sequenziale, aspettando gli script esterni
+      insertSequentially(target, elements, where, 0);
+    }
+    
+    function insertSequentially(target, elements, where, index) {
+      if (index >= elements.length) return; // Fine della sequenza
+      
+      var el = elements[index];
+      var isExternalScript = el.nodeType === 1 && el.tagName === 'SCRIPT' && el.hasAttribute('src');
+      
+      // Funzione per continuare con il prossimo elemento
+      var continueNext = function() {
+        insertSequentially(target, elements, where, index + 1);
+      };
+      
       try {
-        // Inserisci gli elementi nella posizione corretta
+        var newElement;
+        
+        if (el.nodeType === 1) {
+          newElement = cloneAndExecute(el);
+        } else {
+          newElement = el.cloneNode(true);
+        }
+        
+        // Inserisci l'elemento nella posizione corretta
         switch(where){
           case 'prepend':
-            elements.reverse().forEach(function(el) {
-              if (el.nodeType === 1) { // Element node
-                target.insertBefore(cloneAndExecute(el), target.firstChild);
-              } else {
-                target.insertBefore(el.cloneNode(true), target.firstChild);
-              }
-            });
+            target.insertBefore(newElement, target.firstChild);
             break;
           case 'before':
-            elements.forEach(function(el) {
-              if (el.nodeType === 1) {
-                target.parentNode.insertBefore(cloneAndExecute(el), target);
-              } else {
-                target.parentNode.insertBefore(el.cloneNode(true), target);
-              }
-            });
-            break;
+            target.parentNode.insertBefore(newElement, target);
+                break;
           case 'after':
-            elements.reverse().forEach(function(el) {
-              if (el.nodeType === 1) {
-                target.parentNode.insertBefore(cloneAndExecute(el), target.nextSibling);
-              } else {
-                target.parentNode.insertBefore(el.cloneNode(true), target.nextSibling);
-              }
-            });
-            break;
+            target.parentNode.insertBefore(newElement, target.nextSibling);
+                break;
           case 'replace':
-            target.innerHTML = '';
-            elements.forEach(function(el) {
-              if (el.nodeType === 1) {
-                target.appendChild(cloneAndExecute(el));
-              } else {
-                target.appendChild(el.cloneNode(true));
-              }
-            });
-            break;
+            if (index === 0) target.innerHTML = '';
+            target.appendChild(newElement);
+                break;
           case 'append':
           default:
-            elements.forEach(function(el) {
-              if (el.nodeType === 1) {
-                target.appendChild(cloneAndExecute(el));
-              } else {
-                target.appendChild(el.cloneNode(true));
-              }
-            });
+            target.appendChild(newElement);
         }
-      } catch(insertError) {
-        console.warn('Smart Div Injector: Errore nell\'inserimento:', insertError);
+        
+        // Se è uno script esterno, aspetta che sia caricato
+        if (isExternalScript) {
+          newElement.onload = continueNext;
+          newElement.onerror = function() {
+            console.warn('Smart Div Injector: Errore nel caricamento dello script:', el.getAttribute('src'));
+            continueNext();
+          };
+        } else {
+          // Altrimenti continua subito (ma usa setTimeout per evitare problemi di stack)
+          setTimeout(continueNext, 0);
+        }
+      } catch(e) {
+        console.warn('Smart Div Injector: Errore nell\'inserimento dell\'elemento', e);
+        continueNext();
       }
     }
     
@@ -1356,8 +1362,8 @@ class Smart_Div_Injector {
           if (!rule || !rule.selector || !rule.code) {
             console.warn('Smart Div Injector: Regola #' + (index + 1) + ' non valida');
             return;
-          }
-          
+        }
+
           var el = document.querySelector(rule.selector);
           if(!el){ 
             console.warn('Smart Div Injector: Selettore non trovato:', rule.selector);
