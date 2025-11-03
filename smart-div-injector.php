@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Smart Div Injector
- * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple.
- * Version: 2.0.0
+ * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple con varianti, ricerca, filtri e paginazione.
+ * Version: 2.2.0
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  * License: GPL-2.0+
@@ -47,7 +47,7 @@ class Smart_Div_Injector {
             'sdi-admin-style', 
             plugins_url( 'admin-style.css', __FILE__ ), 
             [], 
-            '2.0.0' 
+            '2.2.0' 
         );
     }
     
@@ -227,6 +227,7 @@ class Smart_Div_Injector {
             'before_image', 'after_image'
         ];
         $valid_devices = [ 'both', 'desktop', 'mobile' ];
+        $valid_alignments = [ 'none', 'left', 'right', 'center' ];
         
         $rule = [
             'name'              => isset( $data['name'] ) ? sanitize_text_field( $data['name'] ) : 'Regola senza nome',
@@ -238,48 +239,144 @@ class Smart_Div_Injector {
             'position'          => in_array( $data['position'] ?? 'append', $valid_positions, true ) ? $data['position'] : 'append',
             'paragraph_number'  => isset( $data['paragraph_number'] ) ? absint( $data['paragraph_number'] ) : 1,
             'device_target'     => in_array( $data['device_target'] ?? 'both', $valid_devices, true ) ? $data['device_target'] : 'both',
+            'alignment'         => in_array( $data['alignment'] ?? 'none', $valid_alignments, true ) ? $data['alignment'] : 'none',
+            'active_variant'    => isset( $data['active_variant'] ) ? absint( $data['active_variant'] ) : 0,
         ];
         
-        // Sanitizza il codice
-        $code = $data['code'] ?? '';
+        // Sanitizza le varianti
+        $variants = [];
         
-        // Rimuovi escape automatici aggiunti da editor o copia/incolla
-        $code = stripslashes( $code );
+        if ( isset( $data['variant_names'] ) && is_array( $data['variant_names'] ) ) {
+            foreach ( $data['variant_names'] as $index => $variant_name ) {
+                $variant_code = $data['variant_codes'][ $index ] ?? '';
+                
+                // Skip empty variants
+                if ( empty( $variant_name ) && empty( $variant_code ) ) {
+                    continue;
+                }
+                
+                // Rimuovi escape automatici
+                $variant_code = stripslashes( $variant_code );
+                
+                // Sanitizza il codice
+                if ( current_user_can( 'unfiltered_html' ) ) {
+                    $sanitized_code = $variant_code;
+                } else {
+                    $allowed_html = wp_kses_allowed_html( 'post' );
+                    
+                    $allowed_html['script'] = [
+                        'src'           => true,
+                        'type'          => true,
+                        'async'         => true,
+                        'defer'         => true,
+                        'crossorigin'   => true,
+                        'integrity'     => true,
+                        'charset'       => true,
+                        'id'            => true,
+                        'class'         => true,
+                    ];
+                    $allowed_html['iframe'] = [
+                        'src'           => true,
+                        'width'         => true,
+                        'height'        => true,
+                        'frameborder'   => true,
+                        'allowfullscreen' => true,
+                        'style'         => true,
+                        'id'            => true,
+                        'class'         => true,
+                    ];
+                    
+                    $sanitized_code = wp_kses( $variant_code, $allowed_html );
+                }
+                
+                $variants[] = [
+                    'name' => sanitize_text_field( $variant_name ),
+                    'code' => $sanitized_code,
+                ];
+            }
+        }
         
-        if ( current_user_can( 'unfiltered_html' ) ) {
-            // Gli amministratori possono inserire qualsiasi codice
-            $rule['code'] = $code;
-        } else {
-            // Per altri utenti, usa una whitelist permissiva ma sicura
-            $allowed_html = wp_kses_allowed_html( 'post' );
-            
-            // Aggiungi tag e attributi necessari per gli script
-            $allowed_html['script'] = [
-                'src'           => true,
-                'type'          => true,
-                'async'         => true,
-                'defer'         => true,
-                'crossorigin'   => true,
-                'integrity'     => true,
-                'charset'       => true,
-                'id'            => true,
-                'class'         => true,
+        // Se non ci sono varianti, crea una di default (per retrocompatibilità)
+        if ( empty( $variants ) ) {
+            $variants[] = [
+                'name' => 'Variante 1',
+                'code' => '',
             ];
-            $allowed_html['iframe'] = [
-                'src'           => true,
-                'width'         => true,
-                'height'        => true,
-                'frameborder'   => true,
-                'allowfullscreen' => true,
-                'style'         => true,
-                'id'            => true,
-                'class'         => true,
-            ];
-            
-            $rule['code'] = wp_kses( $code, $allowed_html );
+        }
+        
+        $rule['variants'] = $variants;
+        
+        // Assicurati che active_variant sia valido
+        if ( $rule['active_variant'] >= count( $variants ) ) {
+            $rule['active_variant'] = 0;
         }
         
         return $rule;
+    }
+    
+    /**
+     * Ottieni il codice della variante attiva per una regola
+     */
+    private function get_active_variant_code( $rule ) {
+        // Retrocompatibilità: se esiste 'code' direttamente, usalo
+        if ( isset( $rule['code'] ) && ! isset( $rule['variants'] ) ) {
+            return $rule['code'];
+        }
+        
+        // Ottieni le varianti
+        $variants = $rule['variants'] ?? [];
+        if ( empty( $variants ) ) {
+            return '';
+        }
+        
+        // Ottieni l'indice della variante attiva
+        $active_index = $rule['active_variant'] ?? 0;
+        
+        // Assicurati che l'indice sia valido
+        if ( ! isset( $variants[ $active_index ] ) ) {
+            $active_index = 0;
+        }
+        
+        return $variants[ $active_index ]['code'] ?? '';
+    }
+    
+    /**
+     * Applica lo stile di allineamento al codice
+     */
+    private function apply_alignment( $code, $alignment ) {
+        // Se non c'è allineamento specifico, restituisci il codice così com'è
+        if ( empty( $alignment ) || $alignment === 'none' ) {
+            return $code;
+        }
+        
+        // Genera lo stile in base all'allineamento
+        $style = '';
+        $clear_style = '';
+        
+        switch ( $alignment ) {
+            case 'left':
+                $style = 'float: left; margin-right: 20px; margin-bottom: 15px;';
+                $clear_style = 'clear: both;';
+                break;
+            case 'right':
+                $style = 'float: right; margin-left: 20px; margin-bottom: 15px;';
+                $clear_style = 'clear: both;';
+                break;
+            case 'center':
+                $style = 'margin: 0 auto 15px auto; display: block; text-align: center; clear: both;';
+                break;
+        }
+        
+        // Wrappa il contenuto con un div che ha lo stile appropriato
+        $wrapper_open = '<div class="sdi-alignment-wrapper sdi-alignment-' . esc_attr( $alignment ) . '" style="' . esc_attr( $style ) . '">';
+        $wrapper_close = '</div>';
+        
+        // Se è float, aggiungi anche un clearfix dopo
+        if ( in_array( $alignment, [ 'left', 'right' ] ) ) {
+            $wrapper_close .= '<div style="' . esc_attr( $clear_style ) . '"></div>';
+        }
+        
+        return $wrapper_open . $code . $wrapper_close;
     }
     
     /**
@@ -319,10 +416,64 @@ class Smart_Div_Injector {
      * Render della lista delle regole
      */
     private function render_rules_list_page() {
-        $rules = $this->get_rules();
+        $all_rules = $this->get_rules();
+        
+        // Parametri di ricerca, filtri e paginazione
+        $search = isset( $_GET['s'] ) ? sanitize_text_field( $_GET['s'] ) : '';
+        $filter_status = isset( $_GET['filter_status'] ) ? sanitize_text_field( $_GET['filter_status'] ) : '';
+        $filter_type = isset( $_GET['filter_type'] ) ? sanitize_text_field( $_GET['filter_type'] ) : '';
+        $filter_device = isset( $_GET['filter_device'] ) ? sanitize_text_field( $_GET['filter_device'] ) : '';
+        $per_page = isset( $_GET['per_page'] ) ? absint( $_GET['per_page'] ) : 20;
+        $paged = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+        
+        // Applica filtri
+        $filtered_rules = $all_rules;
+        
+        // Filtro per ricerca (nome)
+        if ( ! empty( $search ) ) {
+            $filtered_rules = array_filter( $filtered_rules, function( $rule ) use ( $search ) {
+                return stripos( $rule['name'], $search ) !== false;
+            });
+        }
+        
+        // Filtro per stato
+        if ( $filter_status === 'active' ) {
+            $filtered_rules = array_filter( $filtered_rules, function( $rule ) {
+                return ! empty( $rule['active'] );
+            });
+        } elseif ( $filter_status === 'inactive' ) {
+            $filtered_rules = array_filter( $filtered_rules, function( $rule ) {
+                return empty( $rule['active'] );
+            });
+        }
+        
+        // Filtro per tipo
+        if ( ! empty( $filter_type ) ) {
+            $filtered_rules = array_filter( $filtered_rules, function( $rule ) use ( $filter_type ) {
+                return $rule['match_mode'] === $filter_type;
+            });
+        }
+        
+        // Filtro per dispositivo
+        if ( ! empty( $filter_device ) ) {
+            $filtered_rules = array_filter( $filtered_rules, function( $rule ) use ( $filter_device ) {
+                return ( $rule['device_target'] ?? 'both' ) === $filter_device;
+            });
+        }
+        
+        // Calcolo paginazione
+        $total_items = count( $filtered_rules );
+        $total_pages = ceil( $total_items / $per_page );
+        $offset = ( $paged - 1 ) * $per_page;
+        
+        // Estrai solo gli elementi della pagina corrente
+        $rules = array_slice( $filtered_rules, $offset, $per_page, true );
         
         // Messaggi di conferma
         $message = isset( $_GET['message'] ) ? $_GET['message'] : '';
+        
+        // Costruisci URL base per mantenere i filtri
+        $base_url = remove_query_arg( [ 'message', 'paged' ], $_SERVER['REQUEST_URI'] );
         
         ?>
         <div class="wrap">
@@ -366,7 +517,7 @@ class Smart_Div_Injector {
                 </div>
             <?php endif; ?>
             
-            <?php if ( empty( $rules ) ) : ?>
+            <?php if ( empty( $all_rules ) ) : ?>
                 <div class="sdi-empty-state">
                     <span class="dashicons dashicons-welcome-add-page"></span>
                     <h3>Nessuna regola configurata</h3>
@@ -377,93 +528,249 @@ class Smart_Div_Injector {
                     </a>
                 </div>
             <?php else : ?>
-                <table class="wp-list-table widefat fixed striped sdi-rules-table">
-                    <thead>
-                        <tr>
-                            <th scope="col" style="width: 100px;">Stato</th>
-                            <th scope="col">Nome Regola</th>
-                            <th scope="col">Tipo</th>
-                            <th scope="col">Target</th>
-                            <th scope="col" style="width: 120px;">Dispositivo</th>
-                            <th scope="col">Selettore CSS</th>
-                            <th scope="col" style="width: 240px;">Azioni</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ( $rules as $rule_id => $rule ) : ?>
+                <!-- Sezione ricerca e filtri -->
+                <div class="sdi-filters-wrapper" style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; margin: 20px 0; border-radius: 4px;">
+                    <form method="get" action="" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+                        <input type="hidden" name="page" value="smart-div-injector">
+                        
+                        <!-- Ricerca -->
+                        <div style="flex: 1; min-width: 250px;">
+                            <label for="sdi-search" style="display: block; margin-bottom: 5px; font-weight: 600;">
+                                🔍 Cerca per nome
+                            </label>
+                            <input type="text" 
+                                   id="sdi-search" 
+                                   name="s" 
+                                   value="<?php echo esc_attr( $search ); ?>" 
+                                   placeholder="Inserisci nome regola..."
+                                   style="width: 100%;">
+                        </div>
+                        
+                        <!-- Filtro Stato -->
+                        <div style="flex: 0 0 180px;">
+                            <label for="filter-status" style="display: block; margin-bottom: 5px; font-weight: 600;">
+                                Stato
+                            </label>
+                            <select id="filter-status" name="filter_status" style="width: 100%;">
+                                <option value="">Tutte</option>
+                                <option value="active" <?php selected( $filter_status, 'active' ); ?>>Solo attive</option>
+                                <option value="inactive" <?php selected( $filter_status, 'inactive' ); ?>>Solo non attive</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Filtro Tipo -->
+                        <div style="flex: 0 0 200px;">
+                            <label for="filter-type" style="display: block; margin-bottom: 5px; font-weight: 600;">
+                                Tipo di contenuto
+                            </label>
+                            <select id="filter-type" name="filter_type" style="width: 100%;">
+                                <option value="">Tutti i tipi</option>
+                                <option value="single_posts" <?php selected( $filter_type, 'single_posts' ); ?>>📄 Tutti gli articoli</option>
+                                <option value="category_archive" <?php selected( $filter_type, 'category_archive' ); ?>>📁 Archivio categoria</option>
+                                <option value="single_posts_category" <?php selected( $filter_type, 'single_posts_category' ); ?>>🏷️ Articoli per categoria</option>
+                                <option value="page" <?php selected( $filter_type, 'page' ); ?>>📃 Pagina specifica</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Filtro Dispositivo -->
+                        <div style="flex: 0 0 180px;">
+                            <label for="filter-device" style="display: block; margin-bottom: 5px; font-weight: 600;">
+                                Dispositivo
+                            </label>
+                            <select id="filter-device" name="filter_device" style="width: 100%;">
+                                <option value="">Tutti i dispositivi</option>
+                                <option value="both" <?php selected( $filter_device, 'both' ); ?>>📱💻 Entrambi</option>
+                                <option value="desktop" <?php selected( $filter_device, 'desktop' ); ?>>💻 Desktop</option>
+                                <option value="mobile" <?php selected( $filter_device, 'mobile' ); ?>>📱 Mobile</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Elementi per pagina -->
+                        <div style="flex: 0 0 120px;">
+                            <label for="per-page" style="display: block; margin-bottom: 5px; font-weight: 600;">
+                                Per pagina
+                            </label>
+                            <select id="per-page" name="per_page" style="width: 100%;">
+                                <option value="10" <?php selected( $per_page, 10 ); ?>>10</option>
+                                <option value="20" <?php selected( $per_page, 20 ); ?>>20</option>
+                                <option value="50" <?php selected( $per_page, 50 ); ?>>50</option>
+                                <option value="100" <?php selected( $per_page, 100 ); ?>>100</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Pulsanti -->
+                        <div style="display: flex; gap: 10px;">
+                            <button type="submit" class="button button-primary" style="height: 32px;">
+                                Applica Filtri
+                            </button>
+                            <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector' ) ); ?>" class="button" style="height: 32px; line-height: 30px;">
+                                Reset
+                            </a>
+                        </div>
+                    </form>
+                    
+                    <!-- Info risultati -->
+                    <?php if ( $search || $filter_status || $filter_type || $filter_device ) : ?>
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; color: #646970;">
+                            <strong>Risultati:</strong> Trovate <?php echo number_format( $total_items ); ?> regole su <?php echo number_format( count( $all_rules ) ); ?> totali
+                            <?php if ( $total_items === 0 ) : ?>
+                                <span style="color: #d63638;">— Nessuna regola corrisponde ai filtri applicati</span>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                
+                <?php if ( empty( $rules ) && $total_items === 0 ) : ?>
+                    <div class="sdi-empty-state">
+                        <span class="dashicons dashicons-search"></span>
+                        <h3>Nessun risultato trovato</h3>
+                        <p>Nessuna regola corrisponde ai criteri di ricerca o filtri selezionati.</p>
+                        <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector' ) ); ?>" class="button">
+                            Reset Filtri
+                        </a>
+                    </div>
+                <?php else : ?>
+                    <table class="wp-list-table widefat fixed striped sdi-rules-table">
+                        <thead>
                             <tr>
-                                <td>
-                                    <span class="sdi-status-badge <?php echo $rule['active'] ? 'active' : 'inactive'; ?>">
-                                        <span class="dashicons dashicons-<?php echo $rule['active'] ? 'yes-alt' : 'dismiss'; ?>"></span>
-                                        <?php echo $rule['active'] ? 'Attiva' : 'Non attiva'; ?>
-                                    </span>
-                                </td>
-                                <td><strong><?php echo esc_html( $rule['name'] ); ?></strong></td>
-                                <td>
-                                    <span class="sdi-type-badge">
-                                        <?php 
-                                        switch ( $rule['match_mode'] ) {
-                                            case 'single_posts':
-                                                echo '📄 Tutti gli articoli';
-                                                break;
-                                            case 'category_archive':
-                                                echo '📁 Archivio categoria';
-                                                break;
-                                            case 'single_posts_category':
-                                                echo '🏷️ Articoli per categoria';
-                                                break;
-                                            case 'page':
-                                                echo '📃 Pagina specifica';
-                                                break;
-                                        }
-                                        ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="sdi-target-info">
-                                        <?php 
-                                        if ( ( $rule['match_mode'] === 'single_posts_category' || $rule['match_mode'] === 'category_archive' ) && $rule['category_id'] ) {
-                                            $cat = get_category( $rule['category_id'] );
-                                            echo '<span class="dashicons dashicons-category"></span>';
-                                            echo $cat ? esc_html( $cat->name ) : 'Categoria #' . $rule['category_id'];
-                                        } elseif ( $rule['match_mode'] === 'page' && $rule['page_id'] ) {
-                                            echo '<span class="dashicons dashicons-admin-page"></span>';
-                                            echo get_the_title( $rule['page_id'] ) ?: 'Pagina #' . $rule['page_id'];
-                                        } else {
-                                            echo '—';
-                                        }
-                                        ?>
-                                    </div>
-                                </td>
-                                <td>
-                                    <?php
-                                    $device = $rule['device_target'] ?? 'both';
-                                    switch ( $device ) {
-                                        case 'desktop':
-                                            echo '<span title="Solo Desktop">💻 Desktop</span>';
-                                            break;
-                                        case 'mobile':
-                                            echo '<span title="Solo Mobile">📱 Mobile</span>';
-                                            break;
-                                        case 'both':
-                                        default:
-                                            echo '<span title="Desktop e Mobile">📱💻 Entrambi</span>';
-                                            break;
-                                    }
-                                    ?>
-                                </td>
-                                <td><code class="sdi-code"><?php echo esc_html( $rule['selector'] ); ?></code></td>
-                                <td>
-                                    <div class="sdi-actions">
-                                        <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector&action=edit&rule_id=' . $rule_id ) ); ?>" class="button sdi-btn-edit">Modifica</a>
-                                        <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=duplicate&rule_id=' . $rule_id ), 'duplicate_rule_' . $rule_id ) ); ?>" class="button sdi-btn-duplicate">Duplica</a>
-                                        <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=delete&rule_id=' . $rule_id ), 'delete_rule_' . $rule_id ) ); ?>" class="button sdi-btn-delete" onclick="return confirm('Sei sicuro di voler eliminare questa regola?');">Elimina</a>
-                                    </div>
-                                </td>
+                                <th scope="col" style="width: 100px;">Stato</th>
+                                <th scope="col">Nome Regola</th>
+                                <th scope="col">Tipo</th>
+                                <th scope="col">Target</th>
+                                <th scope="col" style="width: 120px;">Dispositivo</th>
+                                <th scope="col" style="width: 180px;">Variante Attiva</th>
+                                <th scope="col">Selettore CSS</th>
+                                <th scope="col" style="width: 240px;">Azioni</th>
                             </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( $rules as $rule_id => $rule ) : ?>
+                                <tr>
+                                    <td>
+                                        <span class="sdi-status-badge <?php echo $rule['active'] ? 'active' : 'inactive'; ?>">
+                                            <span class="dashicons dashicons-<?php echo $rule['active'] ? 'yes-alt' : 'dismiss'; ?>"></span>
+                                            <?php echo $rule['active'] ? 'Attiva' : 'Non attiva'; ?>
+                                        </span>
+                                    </td>
+                                    <td><strong><?php echo esc_html( $rule['name'] ); ?></strong></td>
+                                    <td>
+                                        <span class="sdi-type-badge">
+                                            <?php 
+                                            switch ( $rule['match_mode'] ) {
+                                                case 'single_posts':
+                                                    echo '📄 Tutti gli articoli';
+                                                    break;
+                                                case 'category_archive':
+                                                    echo '📁 Archivio categoria';
+                                                    break;
+                                                case 'single_posts_category':
+                                                    echo '🏷️ Articoli per categoria';
+                                                    break;
+                                                case 'page':
+                                                    echo '📃 Pagina specifica';
+                                                    break;
+                                            }
+                                            ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="sdi-target-info">
+                                            <?php 
+                                            if ( ( $rule['match_mode'] === 'single_posts_category' || $rule['match_mode'] === 'category_archive' ) && $rule['category_id'] ) {
+                                                $cat = get_category( $rule['category_id'] );
+                                                echo '<span class="dashicons dashicons-category"></span>';
+                                                echo $cat ? esc_html( $cat->name ) : 'Categoria #' . $rule['category_id'];
+                                            } elseif ( $rule['match_mode'] === 'page' && $rule['page_id'] ) {
+                                                echo '<span class="dashicons dashicons-admin-page"></span>';
+                                                echo get_the_title( $rule['page_id'] ) ?: 'Pagina #' . $rule['page_id'];
+                                            } else {
+                                                echo '—';
+                                            }
+                                            ?>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        $device = $rule['device_target'] ?? 'both';
+                                        switch ( $device ) {
+                                            case 'desktop':
+                                                echo '<span title="Solo Desktop">💻 Desktop</span>';
+                                                break;
+                                            case 'mobile':
+                                                echo '<span title="Solo Mobile">📱 Mobile</span>';
+                                                break;
+                                            case 'both':
+                                            default:
+                                                echo '<span title="Desktop e Mobile">📱💻 Entrambi</span>';
+                                                break;
+                                        }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        // Migrazione per retrocompatibilità
+                                        if ( isset( $rule['code'] ) && ! isset( $rule['variants'] ) ) {
+                                            echo '<span style="color: #666;">—</span>';
+                                        } else {
+                                            $variants = $rule['variants'] ?? [];
+                                            $active_variant = $rule['active_variant'] ?? 0;
+                                            
+                                            if ( empty( $variants ) ) {
+                                                echo '<span style="color: #d63638;">Nessuna variante</span>';
+                                            } elseif ( count( $variants ) === 1 ) {
+                                                echo '<span title="' . esc_attr( $variants[0]['name'] ?? 'Variante 1' ) . '">🎯 ' . esc_html( $variants[0]['name'] ?? 'Variante 1' ) . '</span>';
+                                            } else {
+                                                $active_variant_name = $variants[ $active_variant ]['name'] ?? 'Variante ' . ( $active_variant + 1 );
+                                                ?>
+                                                <div class="sdi-variant-selector" style="display: flex; align-items: center; gap: 8px;">
+                                                    <span class="sdi-variant-badge" title="Variante attiva">
+                                                        🎯 <?php echo esc_html( $active_variant_name ); ?>
+                                                    </span>
+                                                    <span class="sdi-variant-count" title="Totale varianti disponibili">
+                                                        (<?php echo count( $variants ); ?>)
+                                                    </span>
+                                                </div>
+                                                <?php
+                                            }
+                                        }
+                                        ?>
+                                    </td>
+                                    <td><code class="sdi-code"><?php echo esc_html( $rule['selector'] ); ?></code></td>
+                                    <td>
+                                        <div class="sdi-actions">
+                                            <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector&action=edit&rule_id=' . $rule_id ) ); ?>" class="button sdi-btn-edit">Modifica</a>
+                                            <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=duplicate&rule_id=' . $rule_id ), 'duplicate_rule_' . $rule_id ) ); ?>" class="button sdi-btn-duplicate">Duplica</a>
+                                            <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=delete&rule_id=' . $rule_id ), 'delete_rule_' . $rule_id ) ); ?>" class="button sdi-btn-delete" onclick="return confirm('Sei sicuro di voler eliminare questa regola?');">Elimina</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    
+                    <!-- Paginazione -->
+                    <?php if ( $total_pages > 1 ) : ?>
+                        <div class="tablenav bottom">
+                            <div class="tablenav-pages">
+                                <span class="displaying-num"><?php printf( '%s elementi', number_format( $total_items ) ); ?></span>
+                                <?php
+                                $pagination_args = [
+                                    'base'      => add_query_arg( 'paged', '%#%' ),
+                                    'format'    => '',
+                                    'prev_text' => '&laquo; Precedente',
+                                    'next_text' => 'Successivo &raquo;',
+                                    'total'     => $total_pages,
+                                    'current'   => $paged,
+                                    'type'      => 'plain',
+                                ];
+                                echo '<span class="pagination-links">';
+                                echo paginate_links( $pagination_args );
+                                echo '</span>';
+                                ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
             <?php endif; ?>
             
             <p class="description" style="margin-top: 20px;">
@@ -487,7 +794,14 @@ class Smart_Div_Injector {
             'position'         => 'append',
             'paragraph_number' => 1,
             'device_target'    => 'both',
-            'code'             => ''
+            'alignment'        => 'none',
+            'active_variant'   => 0,
+            'variants'         => [
+                [
+                    'name' => 'Variante 1',
+                    'code' => ''
+                ]
+            ]
         ];
         
         $this->render_rule_form( $rule, 'add', null );
@@ -510,6 +824,33 @@ class Smart_Div_Injector {
             </div>
         <?php
             return;
+        }
+        
+        // Migrazione: converti vecchie regole con 'code' in varianti
+        if ( isset( $rule['code'] ) && ! isset( $rule['variants'] ) ) {
+            $rule['variants'] = [
+                [
+                    'name' => 'Variante 1',
+                    'code' => $rule['code']
+                ]
+            ];
+            $rule['active_variant'] = 0;
+            unset( $rule['code'] );
+        }
+        
+        // Assicurati che le varianti esistano
+        if ( ! isset( $rule['variants'] ) || empty( $rule['variants'] ) ) {
+            $rule['variants'] = [
+                [
+                    'name' => 'Variante 1',
+                    'code' => ''
+                ]
+            ];
+        }
+        
+        // Assicurati che active_variant sia impostato
+        if ( ! isset( $rule['active_variant'] ) ) {
+            $rule['active_variant'] = 0;
         }
         
         $this->render_rule_form( $rule, 'edit', $rule_id );
@@ -572,6 +913,19 @@ class Smart_Div_Injector {
                                 <option value="mobile" <?php selected( $rule['device_target'] ?? 'both', 'mobile' ); ?>>📱 Solo Mobile</option>
                             </select>
                             <p class="description">Scegli su quale tipo di dispositivo applicare questa regola</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row"><label for="alignment">Posizionamento contenuto</label></th>
+                        <td>
+                            <select name="alignment" id="alignment" class="regular-text">
+                                <option value="none" <?php selected( $rule['alignment'] ?? 'none', 'none' ); ?>>Nessuno (posizione naturale)</option>
+                                <option value="left" <?php selected( $rule['alignment'] ?? 'none', 'left' ); ?>>⬅️ Float a sinistra</option>
+                                <option value="right" <?php selected( $rule['alignment'] ?? 'none', 'right' ); ?>>➡️ Float a destra</option>
+                                <option value="center" <?php selected( $rule['alignment'] ?? 'none', 'center' ); ?>>↔️ Centrato</option>
+                            </select>
+                            <p class="description">Scegli come posizionare il contenuto iniettato. Float permette al testo di fluire intorno al contenuto.</p>
                         </td>
                     </tr>
                     
@@ -711,21 +1065,73 @@ class Smart_Div_Injector {
                     </tr>
                     
                     <tr>
-                        <th scope="row"><label for="code">Codice da inserire *</label></th>
+                        <th scope="row" style="vertical-align: top; padding-top: 20px;">
+                            <label>Varianti Codice *</label>
+                        </th>
                         <td>
-                            <textarea name="code" id="code" rows="10" class="large-text code" spellcheck="false" placeholder="<div>Il tuo codice HTML/JS/CSS</div>" required><?php echo esc_textarea( $rule['code'] ); ?></textarea>
-                            <p class="description">Il codice verrà inserito tal quale. Solo gli utenti con permesso <code>unfiltered_html</code> possono salvare script non sanitizzati.</p>
+                            <div class="sdi-notice info" style="margin-bottom: 20px;">
+                                <p><strong>💡 Varianti Multiple:</strong> Puoi creare più versioni del codice e scegliere quale attivare. Perfetto per A/B testing o per avere diverse versioni pronte.</p>
+                            </div>
                             
-                            <?php if ( ! empty( $rule['code'] ) && $is_edit ) : ?>
-                                <details style="margin-top: 15px;">
-                                    <summary style="cursor: pointer; font-weight: 600; color: #2271b1;">🔍 Debug: Mostra codice salvato nel database</summary>
-                                    <div style="margin-top: 10px; padding: 15px; background: #f0f0f1; border-left: 4px solid #2271b1; border-radius: 4px;">
-                                        <p style="margin: 0 0 10px 0;"><strong>Questo è esattamente il codice salvato nel database:</strong></p>
-                                        <pre style="background: white; padding: 10px; border: 1px solid #ddd; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;"><?php echo htmlspecialchars( $rule['code'], ENT_QUOTES, 'UTF-8' ); ?></pre>
-                                        <p style="margin: 10px 0 0 0; color: #d63638;"><strong>⚠️ Attenzione:</strong> Se vedi <code>\"</code> o <code>https:/</code> (un solo slash), il codice è corrotto. Cancella tutto e incolla di nuovo il codice originale da Google.</p>
+                            <input type="hidden" name="active_variant" id="active_variant" value="<?php echo esc_attr( $rule['active_variant'] ?? 0 ); ?>">
+                            
+                            <div id="variants-container">
+                                <?php 
+                                $variants = $rule['variants'] ?? [];
+                                $active_variant = $rule['active_variant'] ?? 0;
+                                
+                                foreach ( $variants as $index => $variant ) : 
+                                    $variant_name = $variant['name'] ?? 'Variante ' . ( $index + 1 );
+                                    $variant_code = $variant['code'] ?? '';
+                                    $is_active = ( $index === $active_variant );
+                                ?>
+                                    <div class="sdi-variant-item" data-variant-index="<?php echo $index; ?>">
+                                        <div class="sdi-variant-header">
+                                            <div class="sdi-variant-title">
+                                                <span class="sdi-variant-number">Variante #<?php echo $index + 1; ?></span>
+                                                <input type="text" 
+                                                       name="variant_names[]" 
+                                                       value="<?php echo esc_attr( $variant_name ); ?>" 
+                                                       class="sdi-variant-name-input" 
+                                                       placeholder="Nome variante (es. Banner Natale)"
+                                                       required>
+                                            </div>
+                                            <div class="sdi-variant-actions">
+                                                <?php if ( $is_active ) : ?>
+                                                    <span class="sdi-active-badge">✓ Attiva</span>
+                                                <?php else : ?>
+                                                    <button type="button" class="button sdi-btn-activate-variant" onclick="sdiActivateVariant(<?php echo $index; ?>)">Attiva questa</button>
+                                                <?php endif; ?>
+                                                <?php if ( count( $variants ) > 1 ) : ?>
+                                                    <button type="button" class="button sdi-btn-delete-variant" onclick="sdiRemoveVariant(<?php echo $index; ?>)" title="Elimina variante">
+                                                        <span class="dashicons dashicons-trash"></span>
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        <div class="sdi-variant-body">
+                                            <textarea name="variant_codes[]" 
+                                                      rows="8" 
+                                                      class="large-text code sdi-variant-code" 
+                                                      spellcheck="false" 
+                                                      placeholder="<div>Il tuo codice HTML/JS/CSS</div>"
+                                                      required><?php echo esc_textarea( $variant_code ); ?></textarea>
+                                        </div>
                                     </div>
-                                </details>
-                            <?php endif; ?>
+                                <?php endforeach; ?>
+                            </div>
+                            
+                            <div style="margin-top: 15px;">
+                                <button type="button" class="button" onclick="sdiAddVariant()">
+                                    <span class="dashicons dashicons-plus-alt"></span>
+                                    Aggiungi Nuova Variante
+                                </button>
+                            </div>
+                            
+                            <p class="description" style="margin-top: 15px;">
+                                Il codice verrà inserito tal quale. Solo gli utenti con permesso <code>unfiltered_html</code> possono salvare script non sanitizzati.
+                                <br><strong>Nota:</strong> Solo la variante attiva verrà mostrata sul frontend.
+                            </p>
                         </td>
                     </tr>
                 </table>
@@ -844,6 +1250,121 @@ class Smart_Div_Injector {
                 var manualInput = document.getElementById('page_manual');
                 if (manualInput) {
                     manualInput.value = this.value > 0 ? this.value : '';
+                }
+            });
+        }
+        
+        // ========== GESTIONE VARIANTI ==========
+        
+        var variantCounter = <?php echo count( $rule['variants'] ?? [] ); ?>;
+        
+        function sdiAddVariant() {
+            var container = document.getElementById('variants-container');
+            var newIndex = variantCounter++;
+            
+            var variantHTML = `
+                <div class="sdi-variant-item" data-variant-index="${newIndex}">
+                    <div class="sdi-variant-header">
+                        <div class="sdi-variant-title">
+                            <span class="sdi-variant-number">Variante #${newIndex + 1}</span>
+                            <input type="text" 
+                                   name="variant_names[]" 
+                                   value="Variante ${newIndex + 1}" 
+                                   class="sdi-variant-name-input" 
+                                   placeholder="Nome variante (es. Banner Natale)"
+                                   required>
+                        </div>
+                        <div class="sdi-variant-actions">
+                            <button type="button" class="button sdi-btn-activate-variant" onclick="sdiActivateVariant(${newIndex})">Attiva questa</button>
+                            <button type="button" class="button sdi-btn-delete-variant" onclick="sdiRemoveVariant(${newIndex})" title="Elimina variante">
+                                <span class="dashicons dashicons-trash"></span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="sdi-variant-body">
+                        <textarea name="variant_codes[]" 
+                                  rows="8" 
+                                  class="large-text code sdi-variant-code" 
+                                  spellcheck="false" 
+                                  placeholder="<div>Il tuo codice HTML/JS/CSS</div>"
+                                  required></textarea>
+                    </div>
+                </div>
+            `;
+            
+            container.insertAdjacentHTML('beforeend', variantHTML);
+            sdiUpdateVariantNumbers();
+        }
+        
+        function sdiRemoveVariant(index) {
+            var variants = document.querySelectorAll('.sdi-variant-item');
+            if (variants.length <= 1) {
+                alert('Devi avere almeno una variante!');
+                return;
+            }
+            
+            if (!confirm('Sei sicuro di voler eliminare questa variante?')) {
+                return;
+            }
+            
+            var variantToRemove = document.querySelector('.sdi-variant-item[data-variant-index="' + index + '"]');
+            if (variantToRemove) {
+                variantToRemove.remove();
+                sdiUpdateVariantNumbers();
+                
+                // Se abbiamo eliminato la variante attiva, attiva la prima
+                var activeVariantInput = document.getElementById('active_variant');
+                if (parseInt(activeVariantInput.value) === index) {
+                    sdiActivateVariant(0);
+                } else if (parseInt(activeVariantInput.value) > index) {
+                    // Decrementa l'indice se necessario
+                    activeVariantInput.value = parseInt(activeVariantInput.value) - 1;
+                }
+            }
+        }
+        
+        function sdiActivateVariant(index) {
+            // Aggiorna il campo hidden
+            document.getElementById('active_variant').value = index;
+            
+            // Aggiorna l'UI
+            document.querySelectorAll('.sdi-variant-item').forEach(function(item, idx) {
+                var actionsDiv = item.querySelector('.sdi-variant-actions');
+                if (idx === index) {
+                    actionsDiv.innerHTML = '<span class="sdi-active-badge">✓ Attiva</span>';
+                    if (item.querySelectorAll('.sdi-btn-delete-variant').length === 0 && document.querySelectorAll('.sdi-variant-item').length > 1) {
+                        actionsDiv.innerHTML += `
+                            <button type="button" class="button sdi-btn-delete-variant" onclick="sdiRemoveVariant(${idx})" title="Elimina variante">
+                                <span class="dashicons dashicons-trash"></span>
+                            </button>
+                        `;
+                    }
+                } else {
+                    actionsDiv.innerHTML = `
+                        <button type="button" class="button sdi-btn-activate-variant" onclick="sdiActivateVariant(${idx})">Attiva questa</button>
+                        ${document.querySelectorAll('.sdi-variant-item').length > 1 ? `
+                        <button type="button" class="button sdi-btn-delete-variant" onclick="sdiRemoveVariant(${idx})" title="Elimina variante">
+                            <span class="dashicons dashicons-trash"></span>
+                        </button>
+                        ` : ''}
+                    `;
+                }
+            });
+        }
+        
+        function sdiUpdateVariantNumbers() {
+            document.querySelectorAll('.sdi-variant-item').forEach(function(item, index) {
+                item.setAttribute('data-variant-index', index);
+                item.querySelector('.sdi-variant-number').textContent = 'Variante #' + (index + 1);
+                
+                // Aggiorna anche i pulsanti per mantenere gli indici corretti
+                var activateBtn = item.querySelector('.sdi-btn-activate-variant');
+                if (activateBtn) {
+                    activateBtn.setAttribute('onclick', 'sdiActivateVariant(' + index + ')');
+                }
+                var deleteBtn = item.querySelector('.sdi-btn-delete-variant');
+                if (deleteBtn) {
+                    deleteBtn.setAttribute('onclick', 'sdiRemoveVariant(' + index + ')');
                 }
             });
         }
@@ -1035,10 +1556,24 @@ class Smart_Div_Injector {
                         continue; // Selector necessario per posizioni standard
                     }
                     
+                    // Ottieni il codice della variante attiva
+                    $variant_code = $this->get_active_variant_code( $rule );
+                    
+                    // Se non c'è codice, salta questa regola
+                    if ( empty( $variant_code ) ) {
+                        continue;
+                    }
+                    
+                    // Applica l'allineamento al codice
+                    $aligned_code = $this->apply_alignment( 
+                        $variant_code, 
+                        $rule['alignment'] ?? 'none' 
+                    );
+                    
                     $payload = [
                         'selector' => $rule['selector'],
                         'position' => $rule['position'],
-                        'code'     => $rule['code'],
+                        'code'     => $aligned_code,
                     ];
                     
                     /**
@@ -1082,7 +1617,20 @@ class Smart_Div_Injector {
      * Inietta il codice nel contenuto dell'articolo
      */
     private function inject_in_content( $content, $rule ) {
-        $code = $rule['code'];
+        // Ottieni il codice della variante attiva
+        $variant_code = $this->get_active_variant_code( $rule );
+        
+        // Se non c'è codice, ritorna il contenuto originale
+        if ( empty( $variant_code ) ) {
+            return $content;
+        }
+        
+        // Applica l'allineamento al codice
+        $code = $this->apply_alignment( 
+            $variant_code, 
+            $rule['alignment'] ?? 'none' 
+        );
+        
         $position = $rule['position'];
         $paragraph_number = isset( $rule['paragraph_number'] ) ? absint( $rule['paragraph_number'] ) : 1;
         

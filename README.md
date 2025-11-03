@@ -27,8 +27,12 @@ Perfect for:
 ## Features
 
 ✅ **Unlimited Rules** - Create as many injection rules as you need  
+✅ **Multiple Code Variants** - Create different versions of code for each rule and switch between them  
 ✅ **Flexible Targeting** - Target all posts, category archives, posts by category, or specific pages  
 ✅ **Device Targeting** - Choose desktop-only, mobile-only, or both devices for each rule  
+✅ **Content Alignment** - Position content with float left, float right, or centered alignment  
+✅ **Advanced Search & Filters** - Find rules quickly with search and multiple filters  
+✅ **Smart Pagination** - Navigate through rules with customizable items per page (10, 20, 50, 100)  
 ✅ **Smart Injection Positions** - Standard positions (append, prepend, before, after, replace) + Article-specific positions  
 ✅ **Article-Specific Positions** - Before/after content, paragraphs, images - no CSS selector needed!  
 ✅ **Paragraph Targeting** - Insert before or after any specific paragraph number  
@@ -74,6 +78,52 @@ The plugin uses a **rules-based system**. You can create multiple injection rule
 3. **Save the Rule** - Click "Save Rule"
 4. **Manage Rules** - View all rules in the main list, edit, duplicate, or delete as needed
 
+### Search, Filters & Pagination
+
+When you have many rules, the plugin provides powerful tools to find and manage them efficiently:
+
+#### Search by Name
+- Use the search box to find rules by their name
+- Search is case-insensitive and matches partial text
+- Example: Searching "banner" will find "Homepage Banner", "Mobile Banner", etc.
+
+#### Filter by Status
+- **Tutte** (All) - Show all rules regardless of status
+- **Solo attive** (Active Only) - Show only active rules that are running on the frontend
+- **Solo non attive** (Inactive Only) - Show only inactive/disabled rules
+
+#### Filter by Content Type
+- **Tutti i tipi** (All Types) - Show all content types
+- **📄 Tutti gli articoli** (All Posts) - Show rules targeting all post pages
+- **📁 Archivio categoria** (Category Archive) - Show rules for category archive pages
+- **🏷️ Articoli per categoria** (Posts by Category) - Show rules for posts in specific categories
+- **📃 Pagina specifica** (Specific Page) - Show rules targeting specific pages
+
+#### Filter by Device
+- **Tutti i dispositivi** (All Devices) - Show all device targets
+- **📱💻 Entrambi** (Both) - Show rules targeting both desktop and mobile
+- **💻 Desktop** - Show desktop-only rules
+- **📱 Mobile** - Show mobile-only rules
+
+#### Items Per Page
+Choose how many rules to display per page:
+- 10 items per page (good for detailed review)
+- 20 items per page (default, balanced view)
+- 50 items per page (more items at once)
+- 100 items per page (maximum items for quick scanning)
+
+#### Using Filters
+1. Select your desired filters from the dropdowns
+2. Click "Applica Filtri" (Apply Filters) to update the view
+3. Click "Reset" to clear all filters and return to the full list
+4. Filters persist as you navigate between pages
+
+#### Results Information
+When filters are active, you'll see:
+- Number of matching rules found
+- Total number of rules available
+- A message if no rules match the current filters
+
 ### Rule Settings
 
 #### 1. Rule Name
@@ -82,6 +132,44 @@ Give your rule a descriptive name (e.g., "Banner on News Articles", "Tracking on
 #### 2. Active Status
 Enable or disable the rule without deleting it. Inactive rules won't run on the frontend.
 
+#### 2b. Code Variants (Multiple Versions)
+Create and manage multiple versions of your code within a single rule:
+
+**Features:**
+- **Add Multiple Variants**: Click "Aggiungi Nuova Variante" to create a new code version
+- **Name Each Variant**: Give descriptive names like "Summer Banner", "Christmas Banner", "Black Friday Ad"
+- **Switch Active Variant**: Only one variant is active at a time - choose which one to display
+- **View in List**: The rules list shows which variant is currently active and how many variants exist
+- **Independent Code**: Each variant has its own complete HTML/JS/CSS code
+
+**Use Cases:**
+- **A/B Testing**: Create two versions and test which performs better
+- **Seasonal Content**: Have different versions for holidays, seasons, or special events ready to activate
+- **Regional Variations**: Different content for different markets or languages
+- **Quick Switching**: Change between versions without editing code - just activate a different variant
+- **Backup Versions**: Keep old versions as backup while trying new designs
+
+**How It Works:**
+1. When creating/editing a rule, you'll see the "Varianti Codice" section
+2. Start with one variant (Variante 1) by default
+3. Add more variants with the "+ Aggiungi Nuova Variante" button
+4. Each variant has:
+   - A name field (required)
+   - A code textarea (required)
+   - An "Attiva questa" button to make it the active variant
+   - A delete button (if there's more than one variant)
+5. The active variant is marked with a green "✓ Attiva" badge
+6. Only the active variant's code will be injected on the frontend
+
+**Example Workflow:**
+```
+Rule: "Homepage Banner"
+├── Variante 1: "Standard Banner" (Active) ← Currently shown
+├── Variante 2: "Black Friday Banner" ← Ready to activate
+└── Variante 3: "Christmas Banner" ← Ready to activate
+```
+When Black Friday arrives, simply click "Attiva questa" on Variante 2 - no code editing needed!
+
 #### 3. Device Target
 Choose which devices should display this rule:
 - **Both** (📱💻) - Apply on both desktop and mobile devices (default)
@@ -89,6 +177,20 @@ Choose which devices should display this rule:
 - **Mobile Only** (📱) - Apply only on mobile devices and tablets
 
 > The plugin uses WordPress's `wp_is_mobile()` function to detect mobile devices.
+
+#### 3b. Content Alignment
+Choose how to position the injected content:
+- **Nessuno** (None) - Natural position without any special alignment (default)
+- **Float a sinistra** (⬅️ Float Left) - Float the content to the left, allowing text to wrap around it on the right
+- **Float a destra** (➡️ Float Right) - Float the content to the right, allowing text to wrap around it on the left
+- **Centrato** (↔️ Centered) - Center the content horizontally on the page
+
+**Use Cases:**
+- **Float Left/Right**: Perfect for banners or ads that should have text flowing around them, like traditional magazine layouts
+- **Centered**: Ideal for call-to-action boxes, announcements, or featured content that should be prominently displayed
+- **None**: Best when you want the content to follow the natural document flow without affecting surrounding elements
+
+> The alignment is applied by wrapping your injected code in a `<div>` with appropriate inline styles. Float alignments include automatic clearfix to prevent layout issues.
 
 #### 4. Content Type
 Choose where to apply the injection:
@@ -314,6 +416,78 @@ Enter the HTML/CSS/JavaScript code you want to inject. This field accepts any va
 
 > This widget appears only on desktop, where there's more screen space for a sidebar.
 
+### Example 10: Floating Ad Banner with Text Wrap
+
+**Configuration:**
+- Rule Name: `Floating Ad - Right Side`
+- Active: ✓
+- Device Target: `💻 Desktop Only`
+- Content Type: `All Posts`
+- Content Alignment: `➡️ Float Right`
+- Position: `After Paragraph 2`
+- Code:
+```html
+<div style="width: 300px; background: #fff; border: 2px solid #e0e0e0; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    <p style="text-align: center; color: #999; font-size: 11px; margin: 0 0 10px 0;">ADVERTISEMENT</p>
+    <img src="https://via.placeholder.com/270x200" alt="Ad" style="width: 100%; height: auto; border-radius: 4px;">
+    <h4 style="margin: 10px 0 5px 0; font-size: 16px;">Featured Product</h4>
+    <p style="margin: 0; font-size: 13px; color: #666;">Check out our latest offering!</p>
+</div>
+```
+
+> This creates a floating ad that appears on the right side with text wrapping around it on the left, like traditional print media.
+
+### Example 11: Centered Call-to-Action Box
+
+**Configuration:**
+- Rule Name: `Centered Newsletter CTA`
+- Active: ✓
+- Device Target: `📱💻 Both`
+- Content Type: `Posts by Category`
+- Category: `News`
+- Content Alignment: `↔️ Centered`
+- Position: `After Content`
+- Code:
+```html
+<div style="max-width: 600px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+    <h2 style="color: white; text-align: center; margin: 0 0 15px 0; font-size: 28px;">Stay Updated!</h2>
+    <p style="color: rgba(255,255,255,0.9); text-align: center; margin: 0 0 25px 0; font-size: 16px;">
+        Get the latest news delivered directly to your inbox
+    </p>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+        <input type="email" placeholder="your@email.com" style="flex: 1; min-width: 250px; padding: 12px 20px; border: none; border-radius: 6px; font-size: 15px;">
+        <button style="padding: 12px 30px; background: white; color: #667eea; border: none; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer;">
+            Subscribe
+        </button>
+    </div>
+</div>
+```
+
+> This creates a prominent, centered call-to-action box that draws attention at the end of news articles.
+
+### Example 12: Floating Info Box on the Left
+
+**Configuration:**
+- Rule Name: `Article Info Box - Left`
+- Active: ✓
+- Device Target: `💻 Desktop Only`
+- Content Type: `All Posts`
+- Content Alignment: `⬅️ Float Left`
+- Position: `Before Content`
+- Code:
+```html
+<div style="width: 250px; background: #f8f9fa; border-left: 4px solid #2271b1; padding: 20px; border-radius: 4px;">
+    <h4 style="margin: 0 0 10px 0; color: #2271b1; font-size: 16px;">📌 Quick Info</h4>
+    <ul style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6;">
+        <li>Reading time: 5 min</li>
+        <li>Last updated: Today</li>
+        <li>Category: Tutorial</li>
+    </ul>
+</div>
+```
+
+> This info box floats on the left side of the article content, with text flowing around it on the right.
+
 ## Developer Hooks
 
 ### Filter: `sdi_injection_payload`
@@ -531,6 +705,70 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 - **No external dependencies** - Pure vanilla JavaScript
 
 ## Changelog
+
+### 2.2.0
+- **🎭 Multiple Code Variants**: Revolutionary new feature for managing multiple versions of code
+  - Create unlimited variants within each rule
+  - Each variant has its own name and complete code
+  - Switch between variants with a single click - no code editing needed
+  - Perfect for A/B testing different ad designs or banners
+  - Seasonal content management (Christmas, Summer, Black Friday versions ready to activate)
+  - Regional or language variations in one place
+  - Active variant clearly marked with green badge in form
+  - Variant count and active variant shown in rules list table
+  - Add new variants dynamically with JavaScript interface
+  - Delete unused variants (must keep at least one)
+  - Automatic migration for old rules with single code field
+  - Retrocompatibility ensured - existing rules work seamlessly
+- **🎨 Variants UI**: Beautiful interface for managing variants
+  - Each variant displayed in a card with header and body
+  - Collapsible variant items with hover effects
+  - Color-coded active variant badge
+  - Intuitive add/remove/activate buttons
+  - Real-time variant number updates
+  - Responsive design for mobile devices
+  - Professional styling matching WordPress standards
+- **⚡ Smart Variant Handling**: Efficient backend logic
+  - `get_active_variant_code()` helper function
+  - Only active variant code is injected on frontend
+  - Variants stored as array in database
+  - Empty variants automatically skipped
+  - Active variant index validation
+  - Seamless integration with existing alignment and injection logic
+
+### 2.1.0
+- **🔍 Search & Filters**: Advanced search and filtering system for managing multiple rules
+  - Search rules by name with case-insensitive matching
+  - Filter by status (active/inactive)
+  - Filter by content type (posts, pages, categories)
+  - Filter by device target (desktop/mobile/both)
+  - Filters persist across page navigation
+  - Results counter showing matches vs. total rules
+- **📄 Pagination**: Smart pagination system for large rule lists
+  - Navigate through rules with page numbers
+  - Customizable items per page (10, 20, 50, 100)
+  - "Previous" and "Next" navigation buttons
+  - Total items counter
+  - Pagination persists with active filters
+- **🎯 Content Alignment**: New positioning options for injected content
+  - Float Left (⬅️) - Content floats left with text wrapping on the right
+  - Float Right (➡️) - Content floats right with text wrapping on the left
+  - Centered (↔️) - Content centered horizontally on the page
+  - None - Natural document flow (default)
+  - Automatic clearfix for float alignments to prevent layout issues
+  - Works with both JavaScript injection and WordPress filter injection
+  - Perfect for ads, banners, info boxes, and call-to-action elements
+- **🎨 Enhanced UI**: Improved styling for filters and pagination
+  - Flexbox-based filter layout that adapts to screen size
+  - Professional pagination controls with hover effects
+  - Responsive design for mobile devices
+  - Clean and modern interface matching WordPress standards
+  - Empty state design when no results are found
+- **⚡ Performance**: Efficient filtering and pagination
+  - Client-side filtering for instant results
+  - Array slicing for memory-efficient pagination
+  - No additional database queries for filtering
+  - Smooth page transitions
 
 ### 2.0.0
 - **🎉 Major Update: Multiple Rules System**

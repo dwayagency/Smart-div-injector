@@ -1,6 +1,6 @@
 /**
  * Smart Div Injector - Admin Styles
- * Version: 2.0.0
+ * Version: 2.2.0
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  */
@@ -212,6 +212,28 @@
     font-size: 13px;
     color: var(--sdi-primary-dark);
     border: 1px solid var(--sdi-gray-300);
+}
+
+/* ========================================
+   Variant Display in List
+   ======================================== */
+.sdi-variant-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: var(--sdi-gray-100);
+    border-radius: var(--sdi-border-radius);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--sdi-gray-700);
+    border: 1px solid var(--sdi-gray-300);
+}
+
+.sdi-variant-count {
+    font-size: 11px;
+    color: var(--sdi-gray-500);
+    font-weight: 600;
 }
 
 /* ========================================
@@ -506,6 +528,123 @@
 }
 
 /* ========================================
+   Filters & Search Section
+   ======================================== */
+.sdi-filters-wrapper {
+    background: white;
+    padding: 20px;
+    border: 1px solid var(--sdi-gray-300);
+    margin: 20px 0;
+    border-radius: var(--sdi-border-radius);
+    box-shadow: var(--sdi-shadow-sm);
+}
+
+.sdi-filters-wrapper label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: var(--sdi-gray-700);
+    font-size: 13px;
+}
+
+.sdi-filters-wrapper input[type="text"],
+.sdi-filters-wrapper select {
+    border: 1px solid var(--sdi-gray-300) !important;
+    border-radius: var(--sdi-border-radius) !important;
+    padding: 6px 10px !important;
+    font-size: 14px !important;
+    transition: all 0.2s ease !important;
+}
+
+.sdi-filters-wrapper input[type="text"]:focus,
+.sdi-filters-wrapper select:focus {
+    border-color: var(--sdi-primary) !important;
+    box-shadow: 0 0 0 1px var(--sdi-primary) !important;
+    outline: none !important;
+}
+
+.sdi-filters-wrapper .button-primary {
+    background: var(--sdi-primary) !important;
+    border-color: var(--sdi-primary) !important;
+    color: white !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+}
+
+.sdi-filters-wrapper .button-primary:hover {
+    background: var(--sdi-primary-dark) !important;
+    border-color: var(--sdi-primary-dark) !important;
+    transform: translateY(-1px);
+}
+
+/* ========================================
+   Pagination
+   ======================================== */
+.tablenav.bottom {
+    margin-top: 20px;
+    padding: 15px 0;
+    border-top: 1px solid var(--sdi-gray-300);
+}
+
+.tablenav-pages {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.displaying-num {
+    color: var(--sdi-gray-700);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.pagination-links {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.pagination-links a,
+.pagination-links span.current {
+    display: inline-block;
+    padding: 6px 12px;
+    border: 1px solid var(--sdi-gray-300);
+    border-radius: var(--sdi-border-radius);
+    font-size: 13px;
+    text-decoration: none;
+    color: var(--sdi-gray-700);
+    background: white;
+    transition: all 0.2s ease;
+}
+
+.pagination-links a:hover {
+    background: var(--sdi-primary);
+    border-color: var(--sdi-primary);
+    color: white;
+}
+
+.pagination-links span.current {
+    background: var(--sdi-primary);
+    border-color: var(--sdi-primary);
+    color: white;
+    font-weight: 600;
+}
+
+.pagination-links .prev,
+.pagination-links .next {
+    font-weight: 500;
+}
+
+.pagination-links .dots {
+    border: none;
+    background: transparent;
+    color: var(--sdi-gray-500);
+    padding: 6px 4px;
+}
+
+/* ========================================
    Responsive Design
    ======================================== */
 @media screen and (max-width: 782px) {
@@ -535,6 +674,186 @@
         display: block;
         padding: 5px 0 15px 0 !important;
     }
+    
+    /* Filtri responsive */
+    .sdi-filters-wrapper form {
+        flex-direction: column !important;
+    }
+    
+    .sdi-filters-wrapper form > div {
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+    }
+    
+    .sdi-filters-wrapper .button {
+        width: 100%;
+    }
+    
+    /* Paginazione responsive */
+    .tablenav-pages {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .pagination-links {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    /* Varianti responsive */
+    .sdi-variant-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .sdi-variant-title {
+        flex-direction: column;
+        align-items: stretch;
+        min-width: 100%;
+    }
+    
+    .sdi-variant-actions {
+        flex-wrap: wrap;
+        justify-content: stretch;
+    }
+    
+    .sdi-variant-actions .button {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+/* ========================================
+   Variants Management
+   ======================================== */
+#variants-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.sdi-variant-item {
+    background: var(--sdi-gray-100);
+    border: 2px solid var(--sdi-gray-300);
+    border-radius: var(--sdi-border-radius);
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.sdi-variant-item:hover {
+    border-color: var(--sdi-primary);
+    box-shadow: var(--sdi-shadow);
+}
+
+.sdi-variant-header {
+    background: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    border-bottom: 1px solid var(--sdi-gray-300);
+    flex-wrap: wrap;
+}
+
+.sdi-variant-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 300px;
+}
+
+.sdi-variant-number {
+    font-weight: 600;
+    color: var(--sdi-gray-700);
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.sdi-variant-name-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px !important;
+    border: 1px solid var(--sdi-gray-300) !important;
+    border-radius: var(--sdi-border-radius) !important;
+    font-size: 14px !important;
+    transition: all 0.2s ease !important;
+}
+
+.sdi-variant-name-input:focus {
+    border-color: var(--sdi-primary) !important;
+    box-shadow: 0 0 0 1px var(--sdi-primary) !important;
+    outline: none !important;
+}
+
+.sdi-variant-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sdi-active-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 14px;
+    background: var(--sdi-success);
+    color: white;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.sdi-btn-activate-variant {
+    background: white !important;
+    border-color: var(--sdi-primary) !important;
+    color: var(--sdi-primary) !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+}
+
+.sdi-btn-activate-variant:hover {
+    background: var(--sdi-primary) !important;
+    color: white !important;
+}
+
+.sdi-btn-delete-variant {
+    background: white !important;
+    border-color: var(--sdi-danger) !important;
+    color: var(--sdi-danger) !important;
+    padding: 6px 10px !important;
+    transition: all 0.2s ease !important;
+}
+
+.sdi-btn-delete-variant:hover {
+    background: var(--sdi-danger) !important;
+    color: white !important;
+}
+
+.sdi-btn-delete-variant .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.sdi-variant-body {
+    padding: 20px;
+}
+
+.sdi-variant-code {
+    font-family: 'Courier New', Courier, monospace !important;
+    background: white !important;
+    border: 1px solid var(--sdi-gray-300) !important;
+    border-radius: var(--sdi-border-radius) !important;
+    transition: all 0.2s ease !important;
+}
+
+.sdi-variant-code:focus {
+    border-color: var(--sdi-primary) !important;
+    box-shadow: 0 0 0 1px var(--sdi-primary) !important;
+    outline: none !important;
 }
 
 /* ========================================
