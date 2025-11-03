@@ -28,6 +28,7 @@ Perfect for:
 
 ✅ **Unlimited Rules** - Create as many injection rules as you need  
 ✅ **Multiple Code Variants** - Create different versions of code for each rule and switch between them  
+✅ **Quick Edit** - Modify rules instantly from the list without opening the full editor  
 ✅ **Flexible Targeting** - Target all posts, category archives, posts by category, or specific pages  
 ✅ **Device Targeting** - Choose desktop-only, mobile-only, or both devices for each rule  
 ✅ **Content Alignment** - Position content with float left, float right, or centered alignment  
@@ -705,6 +706,32 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 - **No external dependencies** - Pure vanilla JavaScript
 
 ## Changelog
+
+### 2.3.0
+- **⚡ Quick Edit (Modifica Rapida)**: Edit rules directly from the list without opening the full editor
+  - Inline editing panel appears directly in the rules table
+  - Quick access button with pencil icon
+  - Edit key properties: name, active status, device target, alignment, active variant
+  - Grid layout for form fields - responsive and organized
+  - Save changes with a single click
+  - Cancel button or press ESC to close
+  - Smooth scroll and auto-focus on first field
+  - Success message after quick update
+  - Visual tip reminder that full edit is needed for code changes
+  - Only one quick edit panel open at a time
+  - Professional styling matching WordPress admin
+- **🎨 Quick Edit UI**: Beautiful inline interface
+  - Gray background with blue bottom border for clear separation
+  - Header with rule name and close button
+  - Grid-based responsive layout for fields
+  - Proper spacing and typography
+  - Mobile-friendly responsive design
+  - Keyboard shortcuts (ESC to close)
+- **⚡ Performance**: Efficient inline editing
+  - No page reload required
+  - Instant feedback with smooth animations
+  - Saves only modified fields
+  - Backend validation for all fields
 
 ### 2.2.0
 - **🎭 Multiple Code Variants**: Revolutionary new feature for managing multiple versions of code

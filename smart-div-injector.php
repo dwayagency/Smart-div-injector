@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Smart Div Injector
- * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple con varianti, ricerca, filtri e paginazione.
- * Version: 2.2.0
+ * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple con varianti, modifica rapida, ricerca, filtri e paginazione.
+ * Version: 2.3.0
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  * License: GPL-2.0+
@@ -47,7 +47,7 @@ class Smart_Div_Injector {
             'sdi-admin-style', 
             plugins_url( 'admin-style.css', __FILE__ ), 
             [], 
-            '2.2.0' 
+            '2.3.0' 
         );
     }
     
@@ -163,6 +163,13 @@ class Smart_Div_Injector {
             wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=duplicated' ) );
             exit;
         }
+        
+        // Modifica rapida (quick edit)
+        if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'quick_edit' && isset( $_POST['rule_id'] ) ) {
+            $this->quick_edit_rule( $_POST['rule_id'] );
+            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=quick_updated' ) );
+            exit;
+        }
     }
     
     /**
@@ -213,6 +220,57 @@ class Smart_Div_Injector {
             $rules[ $new_rule_id ] = $new_rule;
             $this->save_rules( $rules );
         }
+    }
+    
+    /**
+     * Modifica rapida di una regola (quick edit)
+     */
+    private function quick_edit_rule( $rule_id ) {
+        $rules = $this->get_rules();
+        
+        if ( ! isset( $rules[ $rule_id ] ) ) {
+            return;
+        }
+        
+        $rule = $rules[ $rule_id ];
+        
+        // Aggiorna solo i campi modificabili tramite quick edit
+        if ( isset( $_POST['name'] ) ) {
+            $rule['name'] = sanitize_text_field( $_POST['name'] );
+        }
+        
+        if ( isset( $_POST['active'] ) ) {
+            $rule['active'] = $_POST['active'] === '1';
+        } else {
+            $rule['active'] = false;
+        }
+        
+        if ( isset( $_POST['device_target'] ) ) {
+            $valid_devices = [ 'both', 'desktop', 'mobile' ];
+            if ( in_array( $_POST['device_target'], $valid_devices, true ) ) {
+                $rule['device_target'] = $_POST['device_target'];
+            }
+        }
+        
+        if ( isset( $_POST['alignment'] ) ) {
+            $valid_alignments = [ 'none', 'left', 'right', 'center' ];
+            if ( in_array( $_POST['alignment'], $valid_alignments, true ) ) {
+                $rule['alignment'] = $_POST['alignment'];
+            }
+        }
+        
+        if ( isset( $_POST['active_variant'] ) ) {
+            $active_variant = absint( $_POST['active_variant'] );
+            $variants = $rule['variants'] ?? [];
+            
+            // Verifica che l'indice sia valido
+            if ( $active_variant >= 0 && $active_variant < count( $variants ) ) {
+                $rule['active_variant'] = $active_variant;
+            }
+        }
+        
+        $rules[ $rule_id ] = $rule;
+        $this->save_rules( $rules );
     }
     
     /**
@@ -515,6 +573,10 @@ class Smart_Div_Injector {
                 <div class="sdi-notice success">
                     <p><strong>✓ Regola duplicata con successo!</strong></p>
                 </div>
+            <?php elseif ( $message === 'quick_updated' ) : ?>
+                <div class="sdi-notice success">
+                    <p><strong>✓ Modifica rapida completata con successo!</strong></p>
+                </div>
             <?php endif; ?>
             
             <?php if ( empty( $all_rules ) ) : ?>
@@ -739,9 +801,104 @@ class Smart_Div_Injector {
                                     <td>
                                         <div class="sdi-actions">
                                             <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector&action=edit&rule_id=' . $rule_id ) ); ?>" class="button sdi-btn-edit">Modifica</a>
+                                            <button type="button" class="button sdi-btn-quick-edit" onclick="sdiShowQuickEdit('<?php echo esc_js( $rule_id ); ?>')">
+                                                <span class="dashicons dashicons-edit"></span>
+                                                Modifica Rapida
+                                            </button>
                                             <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=duplicate&rule_id=' . $rule_id ), 'duplicate_rule_' . $rule_id ) ); ?>" class="button sdi-btn-duplicate">Duplica</a>
                                             <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=delete&rule_id=' . $rule_id ), 'delete_rule_' . $rule_id ) ); ?>" class="button sdi-btn-delete" onclick="return confirm('Sei sicuro di voler eliminare questa regola?');">Elimina</a>
                                         </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Riga Quick Edit -->
+                                <tr id="quick-edit-<?php echo esc_attr( $rule_id ); ?>" class="sdi-quick-edit-row" style="display: none;">
+                                    <td colspan="8">
+                                        <form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector' ) ); ?>" class="sdi-quick-edit-form">
+                                            <?php wp_nonce_field( 'sdi_rule_action', 'sdi_nonce' ); ?>
+                                            <input type="hidden" name="sdi_action" value="quick_edit">
+                                            <input type="hidden" name="rule_id" value="<?php echo esc_attr( $rule_id ); ?>">
+                                            
+                                            <div class="sdi-quick-edit-container">
+                                                <div class="sdi-quick-edit-header">
+                                                    <h4>✏️ Modifica Rapida: <?php echo esc_html( $rule['name'] ); ?></h4>
+                                                    <button type="button" class="button" onclick="sdiCancelQuickEdit('<?php echo esc_js( $rule_id ); ?>')">
+                                                        <span class="dashicons dashicons-no-alt"></span>
+                                                        Annulla
+                                                    </button>
+                                                </div>
+                                                
+                                                <div class="sdi-quick-edit-fields">
+                                                    <div class="sdi-quick-edit-field">
+                                                        <label for="quick-name-<?php echo esc_attr( $rule_id ); ?>">Nome Regola:</label>
+                                                        <input type="text" 
+                                                               id="quick-name-<?php echo esc_attr( $rule_id ); ?>" 
+                                                               name="name" 
+                                                               value="<?php echo esc_attr( $rule['name'] ); ?>" 
+                                                               class="widefat" 
+                                                               required>
+                                                    </div>
+                                                    
+                                                    <div class="sdi-quick-edit-field">
+                                                        <label>
+                                                            <input type="checkbox" 
+                                                                   name="active" 
+                                                                   value="1" 
+                                                                   <?php checked( $rule['active'], true ); ?>>
+                                                            <strong>Regola Attiva</strong>
+                                                        </label>
+                                                    </div>
+                                                    
+                                                    <div class="sdi-quick-edit-field">
+                                                        <label for="quick-device-<?php echo esc_attr( $rule_id ); ?>">Dispositivo:</label>
+                                                        <select id="quick-device-<?php echo esc_attr( $rule_id ); ?>" name="device_target" class="widefat">
+                                                            <option value="both" <?php selected( $rule['device_target'] ?? 'both', 'both' ); ?>>📱💻 Entrambi</option>
+                                                            <option value="desktop" <?php selected( $rule['device_target'] ?? 'both', 'desktop' ); ?>>💻 Solo Desktop</option>
+                                                            <option value="mobile" <?php selected( $rule['device_target'] ?? 'both', 'mobile' ); ?>>📱 Solo Mobile</option>
+                                                        </select>
+                                                    </div>
+                                                    
+                                                    <div class="sdi-quick-edit-field">
+                                                        <label for="quick-alignment-<?php echo esc_attr( $rule_id ); ?>">Allineamento:</label>
+                                                        <select id="quick-alignment-<?php echo esc_attr( $rule_id ); ?>" name="alignment" class="widefat">
+                                                            <option value="none" <?php selected( $rule['alignment'] ?? 'none', 'none' ); ?>>Nessuno</option>
+                                                            <option value="left" <?php selected( $rule['alignment'] ?? 'none', 'left' ); ?>>⬅️ Float a sinistra</option>
+                                                            <option value="right" <?php selected( $rule['alignment'] ?? 'none', 'right' ); ?>>➡️ Float a destra</option>
+                                                            <option value="center" <?php selected( $rule['alignment'] ?? 'none', 'center' ); ?>>↔️ Centrato</option>
+                                                        </select>
+                                                    </div>
+                                                    
+                                                    <?php 
+                                                    $variants = $rule['variants'] ?? [];
+                                                    if ( count( $variants ) > 1 ) :
+                                                    ?>
+                                                    <div class="sdi-quick-edit-field">
+                                                        <label for="quick-variant-<?php echo esc_attr( $rule_id ); ?>">Variante Attiva:</label>
+                                                        <select id="quick-variant-<?php echo esc_attr( $rule_id ); ?>" name="active_variant" class="widefat">
+                                                            <?php foreach ( $variants as $index => $variant ) : ?>
+                                                                <option value="<?php echo esc_attr( $index ); ?>" <?php selected( $rule['active_variant'] ?? 0, $index ); ?>>
+                                                                    <?php echo esc_html( $variant['name'] ?? 'Variante ' . ( $index + 1 ) ); ?>
+                                                                </option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </div>
+                                                    <?php else : ?>
+                                                    <input type="hidden" name="active_variant" value="<?php echo esc_attr( $rule['active_variant'] ?? 0 ); ?>">
+                                                    <?php endif; ?>
+                                                </div>
+                                                
+                                                <div class="sdi-quick-edit-actions">
+                                                    <button type="submit" class="button button-primary">
+                                                        <span class="dashicons dashicons-yes"></span>
+                                                        Aggiorna
+                                                    </button>
+                                                    <button type="button" class="button" onclick="sdiCancelQuickEdit('<?php echo esc_js( $rule_id ); ?>')">
+                                                        Annulla
+                                                    </button>
+                                                    <span class="sdi-quick-edit-tip">💡 Per modificare il codice, usa il pulsante "Modifica" completo</span>
+                                                </div>
+                                            </div>
+                                        </form>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -777,6 +934,50 @@ class Smart_Div_Injector {
                 <strong>Come funziona:</strong> Ogni regola definisce dove e come inserire il codice. Le regole attive vengono applicate automaticamente sul frontend quando le condizioni sono soddisfatte.
             </p>
         </div>
+        
+        <script>
+        // ========== QUICK EDIT ==========
+        function sdiShowQuickEdit(ruleId) {
+            // Nascondi tutti gli altri quick edit aperti
+            document.querySelectorAll('.sdi-quick-edit-row').forEach(function(row) {
+                row.style.display = 'none';
+            });
+            
+            // Mostra il quick edit per questa regola
+            var quickEditRow = document.getElementById('quick-edit-' + ruleId);
+            if (quickEditRow) {
+                quickEditRow.style.display = 'table-row';
+                
+                // Scroll verso il quick edit
+                quickEditRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Focus sul primo campo
+                var firstInput = quickEditRow.querySelector('input[type="text"]');
+                if (firstInput) {
+                    setTimeout(function() {
+                        firstInput.focus();
+                        firstInput.select();
+                    }, 300);
+                }
+            }
+        }
+        
+        function sdiCancelQuickEdit(ruleId) {
+            var quickEditRow = document.getElementById('quick-edit-' + ruleId);
+            if (quickEditRow) {
+                quickEditRow.style.display = 'none';
+            }
+        }
+        
+        // Chiudi quick edit con Esc
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' || e.keyCode === 27) {
+                document.querySelectorAll('.sdi-quick-edit-row').forEach(function(row) {
+                    row.style.display = 'none';
+                });
+            }
+        });
+        </script>
         <?php
     }
 

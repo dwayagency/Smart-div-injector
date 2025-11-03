@@ -1,6 +1,6 @@
 /**
  * Smart Div Injector - Admin Styles
- * Version: 2.2.0
+ * Version: 2.3.0
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  */
@@ -246,6 +246,7 @@
 }
 
 .sdi-btn-edit,
+.sdi-btn-quick-edit,
 .sdi-btn-duplicate,
 .sdi-btn-delete {
     font-size: 13px !important;
@@ -263,6 +264,27 @@
 .sdi-btn-edit:hover {
     background: var(--sdi-primary) !important;
     color: white !important;
+}
+
+.sdi-btn-quick-edit {
+    background: white !important;
+    border-color: #7e8993 !important;
+    color: #2c3338 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+}
+
+.sdi-btn-quick-edit:hover {
+    background: #7e8993 !important;
+    border-color: #7e8993 !important;
+    color: white !important;
+}
+
+.sdi-btn-quick-edit .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
 }
 
 .sdi-btn-duplicate {
@@ -721,6 +743,128 @@
         flex: 1;
         justify-content: center;
     }
+    
+    /* Quick Edit responsive */
+    .sdi-quick-edit-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .sdi-quick-edit-fields {
+        grid-template-columns: 1fr;
+    }
+    
+    .sdi-quick-edit-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .sdi-quick-edit-tip {
+        margin-left: 0;
+        text-align: center;
+    }
+}
+
+/* ========================================
+   Quick Edit
+   ======================================== */
+.sdi-quick-edit-row {
+    background: #f6f7f7;
+    border-top: 1px solid #c3c4c7;
+    border-bottom: 2px solid #2271b1;
+}
+
+.sdi-quick-edit-row td {
+    padding: 0 !important;
+}
+
+.sdi-quick-edit-form {
+    margin: 0;
+}
+
+.sdi-quick-edit-container {
+    padding: 20px;
+}
+
+.sdi-quick-edit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--sdi-gray-300);
+}
+
+.sdi-quick-edit-header h4 {
+    margin: 0;
+    font-size: 16px;
+    color: var(--sdi-gray-900);
+}
+
+.sdi-quick-edit-header .button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.sdi-quick-edit-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.sdi-quick-edit-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sdi-quick-edit-field label {
+    font-weight: 600;
+    color: var(--sdi-gray-700);
+    font-size: 13px;
+}
+
+.sdi-quick-edit-field input[type="text"],
+.sdi-quick-edit-field select {
+    padding: 6px 10px !important;
+    border: 1px solid var(--sdi-gray-300) !important;
+    border-radius: var(--sdi-border-radius) !important;
+    font-size: 14px !important;
+}
+
+.sdi-quick-edit-field input[type="text"]:focus,
+.sdi-quick-edit-field select:focus {
+    border-color: var(--sdi-primary) !important;
+    box-shadow: 0 0 0 1px var(--sdi-primary) !important;
+    outline: none !important;
+}
+
+.sdi-quick-edit-field input[type="checkbox"] {
+    margin-right: 6px;
+}
+
+.sdi-quick-edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-top: 15px;
+    border-top: 1px solid var(--sdi-gray-300);
+}
+
+.sdi-quick-edit-actions .button-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.sdi-quick-edit-tip {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--sdi-gray-500);
+    font-style: italic;
 }
 
 /* ========================================
