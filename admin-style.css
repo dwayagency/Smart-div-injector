@@ -1,6 +1,6 @@
 /**
  * Smart Div Injector - Admin Styles
- * Version: 2.3.1
+ * Version: 2.3.2
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  */
@@ -998,6 +998,17 @@
     border-color: var(--sdi-primary) !important;
     box-shadow: 0 0 0 1px var(--sdi-primary) !important;
     outline: none !important;
+}
+
+.sdi-variant-code.sdi-empty-active {
+    border-color: #f39c12 !important;
+    box-shadow: 0 0 0 1px #f39c12 !important;
+    background: #fffbf0 !important;
+}
+
+.sdi-variant-code.sdi-empty-active:focus {
+    border-color: #e67e22 !important;
+    box-shadow: 0 0 0 2px #e67e22 !important;
 }
 
 /* ========================================

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Smart Div Injector
  * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple con varianti, modifica rapida, ricerca, filtri e paginazione.
- * Version: 2.3.1
+ * Version: 2.3.2
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  * License: GPL-2.0+
@@ -47,7 +47,7 @@ class Smart_Div_Injector {
             'sdi-admin-style', 
             plugins_url( 'admin-style.css', __FILE__ ), 
             [], 
-            '2.3.1'
+            '2.3.2'
         );
     }
     
@@ -773,21 +773,29 @@ class Smart_Div_Injector {
                                         } else {
                                             $variants = $rule['variants'] ?? [];
                                             $active_variant = $rule['active_variant'] ?? 0;
+                                            $active_variant_code = isset( $variants[ $active_variant ]['code'] ) ? $variants[ $active_variant ]['code'] : '';
+                                            $has_code = ! empty( trim( $active_variant_code ) );
                                             
                                             if ( empty( $variants ) ) {
                                                 echo '<span style="color: #d63638;">Nessuna variante</span>';
                                             } elseif ( count( $variants ) === 1 ) {
                                                 echo '<span title="' . esc_attr( $variants[0]['name'] ?? 'Variante 1' ) . '">🎯 ' . esc_html( $variants[0]['name'] ?? 'Variante 1' ) . '</span>';
+                                                if ( ! $has_code ) {
+                                                    echo '<br><span style="color: #d63638; font-size: 11px; font-weight: 600;">⚠️ Codice vuoto - Non verrà iniettato</span>';
+                                                }
                                             } else {
                                                 $active_variant_name = $variants[ $active_variant ]['name'] ?? 'Variante ' . ( $active_variant + 1 );
                                                 ?>
-                                                <div class="sdi-variant-selector" style="display: flex; align-items: center; gap: 8px;">
+                                                <div class="sdi-variant-selector" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                                                     <span class="sdi-variant-badge" title="Variante attiva">
                                                         🎯 <?php echo esc_html( $active_variant_name ); ?>
                                                     </span>
                                                     <span class="sdi-variant-count" title="Totale varianti disponibili">
                                                         (<?php echo count( $variants ); ?>)
                                                     </span>
+                                                    <?php if ( ! $has_code ) : ?>
+                                                        <span style="color: #d63638; font-size: 11px; font-weight: 600; width: 100%;">⚠️ Codice vuoto - Non verrà iniettato</span>
+                                                    <?php endif; ?>
                                                 </div>
                                                 <?php
                                             }
@@ -1319,9 +1327,14 @@ class Smart_Div_Injector {
                                             </div>
                                         </div>
                                         <div class="sdi-variant-body">
+                                            <?php if ( $is_active && empty( trim( $variant_code ) ) ) : ?>
+                                                <div style="background: #fcf3cf; border-left: 4px solid #f39c12; padding: 12px; margin-bottom: 10px;">
+                                                    <strong>⚠️ Attenzione:</strong> Questa è la variante attiva ma il codice è vuoto. Il codice non verrà iniettato finché non aggiungi del contenuto qui.
+                                                </div>
+                                            <?php endif; ?>
                                             <textarea name="variant_codes[]" 
                                                       rows="8" 
-                                                      class="large-text code sdi-variant-code" 
+                                                      class="large-text code sdi-variant-code <?php echo ( $is_active && empty( trim( $variant_code ) ) ) ? 'sdi-empty-active' : ''; ?>" 
                                                       spellcheck="false" 
                                                       placeholder="<div>Il tuo codice HTML/JS/CSS</div>"
                                                       required><?php echo esc_textarea( $variant_code ); ?></textarea>
@@ -1772,8 +1785,18 @@ class Smart_Div_Injector {
                     // Ottieni il codice della variante attiva
                     $variant_code = $this->get_active_variant_code( $rule );
                     
+                    // Debug: Aggiungi un commento HTML se WP_DEBUG è attivo e il codice è vuoto
+                    if ( defined( 'WP_DEBUG' ) && WP_DEBUG && empty( trim( $variant_code ) ) ) {
+                        add_action( 'wp_footer', function() use ( $rule_id, $rule ) {
+                            $rule_name = esc_html( $rule['name'] ?? 'Senza nome' );
+                            $active_var = $rule['active_variant'] ?? 0;
+                            $variants_count = count( $rule['variants'] ?? [] );
+                            echo "<!-- Smart Div Injector DEBUG: Regola '{$rule_name}' (ID: {$rule_id}) - Variante attiva #{$active_var}/{$variants_count} ha codice vuoto -->\n";
+                        }, 999 );
+                    }
+                    
                     // Se non c'è codice, salta questa regola
-                    if ( empty( $variant_code ) ) {
+                    if ( empty( trim( $variant_code ) ) ) {
                         continue;
                     }
                     

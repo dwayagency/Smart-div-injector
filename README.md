@@ -1,6 +1,6 @@
 # Smart Div Injector
 
-**Version:** 2.3.1  
+**Version:** 2.3.2  
 **Author:** DWAY SRL  
 **Author URI:** https://dway.agency  
 **License:** GPL-2.0+  
@@ -706,6 +706,23 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 - **No external dependencies** - Pure vanilla JavaScript
 
 ## Changelog
+
+### 2.3.2
+- **🔍 Diagnostic Tools**: Added visual indicators and debugging features to help identify why code isn't being injected
+  - **Visual Warning in Rules List**: Red warning "⚠️ Codice vuoto - Non verrà iniettato" appears in the "Variante Attiva" column when the active variant has no code
+  - **Edit Form Warning**: Yellow alert box appears in the edit form when the active variant is empty, clearly explaining the issue
+  - **CSS Highlighting**: Empty active variant textareas are highlighted with an orange border and light yellow background
+  - **Debug Mode**: When WP_DEBUG is enabled, HTML comments are added to the page footer showing which rules have empty code
+  - **Console Warnings**: Enhanced JavaScript console messages to help diagnose injection issues
+- **💡 User Experience**: Better feedback for common issues
+  - Users now immediately see why their code isn't appearing on the frontend
+  - Clear visual cues guide users to add content to empty variants
+  - No more confusion about "why isn't my code showing up?"
+  - Helpful styling draws attention to variants that need attention
+- **🎨 UI Improvements**: Enhanced variant display
+  - Active variant code status is now visible at a glance in the rules list
+  - Responsive flex layout for variant badges and warnings
+  - Professional color coding (red for warnings, yellow for attention needed)
 
 ### 2.3.1
 - **🐛 Bug Fix**: Fixed JavaScript conflict when multiple rules are present
