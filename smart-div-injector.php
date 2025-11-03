@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Smart Div Injector
  * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple con varianti, modifica rapida, ricerca, filtri e paginazione.
- * Version: 2.3.0
+ * Version: 2.3.1
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  * License: GPL-2.0+
@@ -47,7 +47,7 @@ class Smart_Div_Injector {
             'sdi-admin-style', 
             plugins_url( 'admin-style.css', __FILE__ ), 
             [], 
-            '2.3.0' 
+            '2.3.1'
         );
     }
     
@@ -308,11 +308,6 @@ class Smart_Div_Injector {
             foreach ( $data['variant_names'] as $index => $variant_name ) {
                 $variant_code = $data['variant_codes'][ $index ] ?? '';
                 
-                // Skip empty variants
-                if ( empty( $variant_name ) && empty( $variant_code ) ) {
-                    continue;
-                }
-                
                 // Rimuovi escape automatici
                 $variant_code = stripslashes( $variant_code );
                 
@@ -347,6 +342,8 @@ class Smart_Div_Injector {
                     $sanitized_code = wp_kses( $variant_code, $allowed_html );
                 }
                 
+                // Salva SEMPRE la variante, anche se il codice è vuoto
+                // (mantiene gli indici corretti e l'utente può compilarla dopo)
                 $variants[] = [
                     'name' => sanitize_text_field( $variant_name ),
                     'code' => $sanitized_code,
@@ -354,7 +351,7 @@ class Smart_Div_Injector {
             }
         }
         
-        // Se non ci sono varianti, crea una di default (per retrocompatibilità)
+        // Se non ci sono varianti, crea una di default
         if ( empty( $variants ) ) {
             $variants[] = [
                 'name' => 'Variante 1',
@@ -936,47 +933,58 @@ class Smart_Div_Injector {
         </div>
         
         <script>
-        // ========== QUICK EDIT ==========
-        function sdiShowQuickEdit(ruleId) {
-            // Nascondi tutti gli altri quick edit aperti
-            document.querySelectorAll('.sdi-quick-edit-row').forEach(function(row) {
-                row.style.display = 'none';
-            });
+        (function() {
+            'use strict';
             
-            // Mostra il quick edit per questa regola
-            var quickEditRow = document.getElementById('quick-edit-' + ruleId);
-            if (quickEditRow) {
-                quickEditRow.style.display = 'table-row';
-                
-                // Scroll verso il quick edit
-                quickEditRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
-                // Focus sul primo campo
-                var firstInput = quickEditRow.querySelector('input[type="text"]');
-                if (firstInput) {
-                    setTimeout(function() {
-                        firstInput.focus();
-                        firstInput.select();
-                    }, 300);
-                }
-            }
-        }
-        
-        function sdiCancelQuickEdit(ruleId) {
-            var quickEditRow = document.getElementById('quick-edit-' + ruleId);
-            if (quickEditRow) {
-                quickEditRow.style.display = 'none';
-            }
-        }
-        
-        // Chiudi quick edit con Esc
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' || e.keyCode === 27) {
-                document.querySelectorAll('.sdi-quick-edit-row').forEach(function(row) {
+            // ========== QUICK EDIT ==========
+            window.sdiShowQuickEdit = function(ruleId) {
+                // Nascondi tutti gli altri quick edit aperti
+                var allRows = document.querySelectorAll('.sdi-quick-edit-row');
+                allRows.forEach(function(row) {
                     row.style.display = 'none';
                 });
+                
+                // Mostra il quick edit per questa regola
+                var quickEditRow = document.getElementById('quick-edit-' + ruleId);
+                if (quickEditRow) {
+                    quickEditRow.style.display = 'table-row';
+                    
+                    // Scroll verso il quick edit
+                    setTimeout(function() {
+                        quickEditRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                    
+                    // Focus sul primo campo
+                    var firstInput = quickEditRow.querySelector('input[type="text"]');
+                    if (firstInput) {
+                        setTimeout(function() {
+                            firstInput.focus();
+                            firstInput.select();
+                        }, 400);
+                    }
+                }
+            };
+            
+            window.sdiCancelQuickEdit = function(ruleId) {
+                var quickEditRow = document.getElementById('quick-edit-' + ruleId);
+                if (quickEditRow) {
+                    quickEditRow.style.display = 'none';
+                }
+            };
+            
+            // Chiudi quick edit con Esc (solo se non già registrato)
+            if (!window.sdiQuickEditEscListenerRegistered) {
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape' || e.keyCode === 27) {
+                        var allRows = document.querySelectorAll('.sdi-quick-edit-row');
+                        allRows.forEach(function(row) {
+                            row.style.display = 'none';
+                        });
+                    }
+                });
+                window.sdiQuickEditEscListenerRegistered = true;
             }
-        });
+        })();
         </script>
         <?php
     }
@@ -1457,9 +1465,12 @@ class Smart_Div_Injector {
         
         // ========== GESTIONE VARIANTI ==========
         
-        var variantCounter = <?php echo count( $rule['variants'] ?? [] ); ?>;
-        
-        function sdiAddVariant() {
+        (function() {
+            'use strict';
+            
+            var variantCounter = <?php echo count( $rule['variants'] ?? [] ); ?>;
+            
+            window.sdiAddVariant = function() {
             var container = document.getElementById('variants-container');
             var newIndex = variantCounter++;
             
@@ -1495,9 +1506,9 @@ class Smart_Div_Injector {
             
             container.insertAdjacentHTML('beforeend', variantHTML);
             sdiUpdateVariantNumbers();
-        }
+        };
         
-        function sdiRemoveVariant(index) {
+        window.sdiRemoveVariant = function(index) {
             var variants = document.querySelectorAll('.sdi-variant-item');
             if (variants.length <= 1) {
                 alert('Devi avere almeno una variante!');
@@ -1522,9 +1533,9 @@ class Smart_Div_Injector {
                     activeVariantInput.value = parseInt(activeVariantInput.value) - 1;
                 }
             }
-        }
+        };
         
-        function sdiActivateVariant(index) {
+        window.sdiActivateVariant = function(index) {
             // Aggiorna il campo hidden
             document.getElementById('active_variant').value = index;
             
@@ -1551,7 +1562,7 @@ class Smart_Div_Injector {
                     `;
                 }
             });
-        }
+        };
         
         function sdiUpdateVariantNumbers() {
             document.querySelectorAll('.sdi-variant-item').forEach(function(item, index) {
@@ -1570,16 +1581,17 @@ class Smart_Div_Injector {
             });
         }
         
-        // Esegui al caricamento
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
+            // Esegui al caricamento
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    sdiToggleFields();
+                    sdiTogglePositionFields();
+                });
+            } else {
                 sdiToggleFields();
                 sdiTogglePositionFields();
-            });
-        } else {
-            sdiToggleFields();
-            sdiTogglePositionFields();
-        }
+            }
+        })();
         </script>
         <?php
     }

@@ -1,6 +1,6 @@
 # Smart Div Injector
 
-**Version:** 2.0.0  
+**Version:** 2.3.1  
 **Author:** DWAY SRL  
 **Author URI:** https://dway.agency  
 **License:** GPL-2.0+  
@@ -706,6 +706,22 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 - **No external dependencies** - Pure vanilla JavaScript
 
 ## Changelog
+
+### 2.3.1
+- **🐛 Bug Fix**: Fixed JavaScript conflict when multiple rules are present
+  - Wrapped Quick Edit scripts in IIFE (Immediately Invoked Function Expression) for proper scope isolation
+  - Added protection against duplicate event listener registration
+  - Improved timing for scroll and focus operations to prevent race conditions
+  - Fixed conflict with jQuery and other theme/plugin scripts (specifically resolved "cluentina" error)
+- **🔧 Variant Handling**: Improved variant saving and index management
+  - Now correctly saves all variants including empty ones to maintain proper indices
+  - Fixed issue where active_variant index would become incorrect after saving
+  - Ensured frontend only skips injection when code is empty, not during save
+  - Simplified sanitization logic for better reliability
+- **⚡ Stability**: Enhanced overall plugin stability
+  - Better JavaScript isolation to prevent conflicts
+  - Improved variant data integrity
+  - Fixed edge cases in variant activation
 
 ### 2.3.0
 - **⚡ Quick Edit (Modifica Rapida)**: Edit rules directly from the list without opening the full editor
