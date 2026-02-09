@@ -1870,7 +1870,7 @@ class Smart_Div_Injector {
                 ];
             }, $payloads );
             
-            wp_register_script( 'sdi-runtime', false, [], false, true );
+            wp_register_script( 'sdi-runtime', false, [], '2.5.2', true );
             wp_enqueue_script( 'sdi-runtime' );
             
             // Passa i dati codificati
