@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Smart Div Injector
  * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple con varianti, modifica rapida, ricerca, filtri e paginazione.
- * Version: 2.3.2
+ * Version: 2.3.3
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  * License: GPL-2.0+
@@ -47,7 +47,7 @@ class Smart_Div_Injector {
             'sdi-admin-style', 
             plugins_url( 'admin-style.css', __FILE__ ), 
             [], 
-            '2.3.2'
+            '2.3.3'
         );
     }
     
@@ -1718,11 +1718,6 @@ class Smart_Div_Injector {
         foreach ( $rules as $rule_id => $rule ) {
             // Salta regole non attive
             if ( empty( $rule['active'] ) ) {
-                continue;
-            }
-            
-            // Verifica configurazione minima (il code è sempre necessario)
-            if ( empty( $rule['code'] ) ) {
                 continue;
             }
             

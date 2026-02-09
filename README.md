@@ -1,6 +1,6 @@
 # Smart Div Injector
 
-**Version:** 2.3.2  
+**Version:** 2.3.3  
 **Author:** DWAY SRL  
 **Author URI:** https://dway.agency  
 **License:** GPL-2.0+  
@@ -706,6 +706,15 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 - **No external dependencies** - Pure vanilla JavaScript
 
 ## Changelog
+
+### 2.3.3
+- **🐛 CRITICAL BUG FIX**: Fixed code injection completely broken since variant system introduction
+  - **Root Cause**: Obsolete check for `$rule['code']` field was preventing ALL rules from being processed
+  - **Impact**: No code was being injected on the frontend at all, regardless of configuration
+  - **Solution**: Removed the outdated validation check that was looking for the old `code` field
+  - **Status**: Code injection now works correctly with the variant system
+  - This was a blocking bug that made the plugin non-functional for all users using variants
+  - If you were experiencing "code not appearing on frontend" issues, this fix resolves it completely
 
 ### 2.3.2
 - **🔍 Diagnostic Tools**: Added visual indicators and debugging features to help identify why code isn't being injected
