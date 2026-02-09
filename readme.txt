@@ -2,8 +2,8 @@
 Contributors: dwaysrl
 Tags: code injection, html injection, javascript, css, content injection
 Requires at least: 5.0
-Tested up to: 6.9.1
-Stable tag: 2.5.1
+Tested up to: 6.9
+Stable tag: 2.5.2
 Requires PHP: 7.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -105,6 +105,17 @@ Yes! The plugin is fully compatible with WordPress Multisite and includes a Netw
 5. Site-Wide targeting option
 
 == Changelog ==
+
+= 2.5.2 =
+* Security: Fixed all WordPress Coding Standards violations
+* Security: Added wp_unslash() to all $_POST and $_GET variables
+* Security: Added proper escaping to all output variables
+* Security: Replaced wp_redirect() with wp_safe_redirect() for all redirects
+* Fix: Removed .DS_Store hidden files
+* Fix: Renamed hook 'sdi_injection_payload' to 'smart_div_injector_injection_payload' for proper naming convention
+* Enhancement: Added phpcs:ignore comments for intentional exceptions (paginate_links, debug comments)
+* Code Quality: All Plugin Check errors and warnings resolved
+* Code Quality: Full WordPress.org coding standards compliance
 
 = 2.5.1 =
 * Fix: Removed heredoc/nowdoc syntax for WordPress.org compliance

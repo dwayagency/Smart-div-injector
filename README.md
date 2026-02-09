@@ -1,13 +1,13 @@
 # Smart Div Injector
 
-**Version:** 2.5.1  
-**Stable tag:** 2.5.1  
+**Version:** 2.5.2  
+**Stable tag:** 2.5.2  
 **Author:** DWAY SRL  
 **Author URI:** https://dway.agency  
 **License:** GPL-2.0+  
 **Requires at least:** WordPress 5.0  
 **Requires PHP:** 7.2  
-**Tested up to:** 6.9.1  
+**Tested up to:** 6.9
 **Network:** Compatible with WordPress Multisite  
 
 ## Description
@@ -712,6 +712,24 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 - **No external dependencies** - Pure vanilla JavaScript
 
 ## Changelog
+
+### 2.5.2 - Security & Code Standards Fix
+- **🔒 SECURITY FIXES**: Resolved all WordPress Coding Standards violations
+  - Added `wp_unslash()` to all `$_POST` and `$_GET` variable processing
+  - Added proper escaping (`esc_html`, `absint`) to all output variables
+  - Replaced `wp_redirect()` with `wp_safe_redirect()` for safer redirects
+  - Fixed input sanitization throughout the codebase
+- **🛡️ SECURITY ENHANCEMENTS**:
+  - All user inputs now properly unslashed before processing
+  - All outputs properly escaped to prevent XSS
+  - All redirects use wp_safe_redirect for additional security
+- **🔧 CODE QUALITY**:
+  - Removed hidden .DS_Store files
+  - Renamed hook to follow WordPress naming conventions
+  - Added phpcs:ignore comments for intentional exceptions
+  - Zero Plugin Check errors and warnings
+- **✅ WordPress.org Compliance**: Plugin now passes ALL Plugin Check tests
+- **Impact**: Enhanced security, full WordPress coding standards compliance
 
 ### 2.5.1 - WordPress.org Compatibility Fix
 - **🔧 COMPATIBILITY FIX**: Removed heredoc/nowdoc syntax for WordPress.org compliance
