@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Smart Div Injector
  * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple con varianti, modifica rapida, ricerca, filtri e paginazione.
- * Version: 2.4.0
+ * Version: 2.5.0
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  * License: GPL-2.0+
@@ -47,7 +47,7 @@ class Smart_Div_Injector {
             'sdi-admin-style', 
             plugins_url( 'admin-style.css', __FILE__ ), 
             [], 
-            '2.4.0'
+            '2.5.0'
         );
     }
     
@@ -277,7 +277,7 @@ class Smart_Div_Injector {
      * Sanitizza i dati della regola
      */
     private function sanitize_rule_data( $data ) {
-        $valid_modes = [ 'single_posts', 'category_archive', 'single_posts_category', 'page' ];
+        $valid_modes = [ 'single_posts', 'category_archive', 'single_posts_category', 'page', 'site_wide' ];
         $valid_positions = [ 
             'append', 'prepend', 'before', 'after', 'replace',
             'before_post', 'before_content', 'after_content',
@@ -624,6 +624,7 @@ class Smart_Div_Injector {
                             </label>
                             <select id="filter-type" name="filter_type" style="width: 100%;">
                                 <option value="">Tutti i tipi</option>
+                                <option value="site_wide" <?php selected( $filter_type, 'site_wide' ); ?>>🌐 Tutto il sito web</option>
                                 <option value="single_posts" <?php selected( $filter_type, 'single_posts' ); ?>>📄 Tutti gli articoli</option>
                                 <option value="category_archive" <?php selected( $filter_type, 'category_archive' ); ?>>📁 Archivio categoria</option>
                                 <option value="single_posts_category" <?php selected( $filter_type, 'single_posts_category' ); ?>>🏷️ Articoli per categoria</option>
@@ -716,6 +717,9 @@ class Smart_Div_Injector {
                                         <span class="sdi-type-badge">
                                             <?php 
                                             switch ( $rule['match_mode'] ) {
+                                                case 'site_wide':
+                                                    echo '🌐 Tutto il sito web';
+                                                    break;
                                                 case 'single_posts':
                                                     echo '📄 Tutti gli articoli';
                                                     break;
@@ -735,7 +739,10 @@ class Smart_Div_Injector {
                                     <td>
                                         <div class="sdi-target-info">
                                             <?php 
-                                            if ( ( $rule['match_mode'] === 'single_posts_category' || $rule['match_mode'] === 'category_archive' ) && $rule['category_id'] ) {
+                                            if ( $rule['match_mode'] === 'site_wide' ) {
+                                                echo '<span class="dashicons dashicons-admin-site"></span>';
+                                                echo 'Tutto il sito';
+                                            } elseif ( ( $rule['match_mode'] === 'single_posts_category' || $rule['match_mode'] === 'category_archive' ) && $rule['category_id'] ) {
                                                 $cat = get_category( $rule['category_id'] );
                                                 echo '<span class="dashicons dashicons-category"></span>';
                                                 echo $cat ? esc_html( $cat->name ) : 'Categoria #' . $rule['category_id'];
@@ -1150,10 +1157,11 @@ class Smart_Div_Injector {
                         <th scope="row"><label for="match_mode">Tipo di contenuto *</label></th>
                         <td>
                             <select name="match_mode" id="match_mode" onchange="sdiToggleFields()">
-                                <option value="single_posts" <?php selected( $rule['match_mode'], 'single_posts' ); ?>>Tutti gli articoli</option>
-                                <option value="category_archive" <?php selected( $rule['match_mode'], 'category_archive' ); ?>>Pagina archivio categoria</option>
-                                <option value="single_posts_category" <?php selected( $rule['match_mode'], 'single_posts_category' ); ?>>Articoli di una categoria</option>
-                                <option value="page" <?php selected( $rule['match_mode'], 'page' ); ?>>Pagina specifica</option>
+                                <option value="site_wide" <?php selected( $rule['match_mode'], 'site_wide' ); ?>>🌐 Tutto il sito web</option>
+                                <option value="single_posts" <?php selected( $rule['match_mode'], 'single_posts' ); ?>>📄 Tutti gli articoli</option>
+                                <option value="category_archive" <?php selected( $rule['match_mode'], 'category_archive' ); ?>>📁 Pagina archivio categoria</option>
+                                <option value="single_posts_category" <?php selected( $rule['match_mode'], 'single_posts_category' ); ?>>🏷️ Articoli di una categoria</option>
+                                <option value="page" <?php selected( $rule['match_mode'], 'page' ); ?>>📃 Pagina specifica</option>
                             </select>
                             <p class="description">Scegli dove attivare l'iniezione del codice</p>
                         </td>
@@ -1734,6 +1742,11 @@ class Smart_Div_Injector {
         $match = false;
 
             switch ( $rule['match_mode'] ) {
+                case 'site_wide':
+                    // Tutto il sito web - match sempre
+                    $match = true;
+                    break;
+                    
                 case 'single_posts':
                     // Tutti gli articoli
                     $match = $is_single_post;

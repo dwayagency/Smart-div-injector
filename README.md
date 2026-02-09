@@ -1,6 +1,6 @@
 # Smart Div Injector
 
-**Version:** 2.4.0  
+**Version:** 2.5.0  
 **Author:** DWAY SRL  
 **Author URI:** https://dway.agency  
 **License:** GPL-2.0+  
@@ -29,7 +29,8 @@ Perfect for:
 ✅ **Unlimited Rules** - Create as many injection rules as you need  
 ✅ **Multiple Code Variants** - Create different versions of code for each rule and switch between them  
 ✅ **Quick Edit** - Modify rules instantly from the list without opening the full editor  
-✅ **Flexible Targeting** - Target all posts, category archives, posts by category, or specific pages  
+✅ **Flexible Targeting** - Target the entire website, all posts, category archives, posts by category, or specific pages  
+✅ **Site-Wide Mode** - NEW! Apply rules globally across the entire website (perfect for cookie banners, global announcements)  
 ✅ **Device Targeting** - Choose desktop-only, mobile-only, or both devices for each rule  
 ✅ **Content Alignment** - Position content with float left, float right, or centered alignment  
 ✅ **Advanced Search & Filters** - Find rules quickly with search and multiple filters  
@@ -95,6 +96,7 @@ When you have many rules, the plugin provides powerful tools to find and manage 
 
 #### Filter by Content Type
 - **Tutti i tipi** (All Types) - Show all content types
+- **🌐 Tutto il sito web** (Entire Website) - Show rules applied globally to all pages
 - **📄 Tutti gli articoli** (All Posts) - Show rules targeting all post pages
 - **📁 Archivio categoria** (Category Archive) - Show rules for category archive pages
 - **🏷️ Articoli per categoria** (Posts by Category) - Show rules for posts in specific categories
@@ -195,10 +197,13 @@ Choose how to position the injected content:
 
 #### 4. Content Type
 Choose where to apply the injection:
+- **🌐 Entire Website** (Tutto il sito web) - **NEW!** Inject on ALL pages across your entire website (posts, pages, archives, home, etc.)
 - **All Posts** (Tutti gli articoli) - Inject on all single post pages
 - **Category Archive Page** (Pagina archivio categoria) - Inject on the category archive page (e.g., example.com/category/news/)
 - **Posts by Category** (Articoli di una categoria) - Inject only on single posts that belong to a specific category
 - **Specific Page** (Pagina specifica) - Inject only on a selected page
+
+> **Site-Wide Mode** is perfect for global elements like cookie consent banners, GDPR notices, promotional announcements, tracking scripts, or any content that should appear everywhere on your site.
 
 #### 5. Category (when applicable)
 If you selected "Category Archive Page" or "Posts by Category", choose which category to target.
@@ -706,6 +711,27 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 - **No external dependencies** - Pure vanilla JavaScript
 
 ## Changelog
+
+### 2.5.0 - Site-Wide Targeting Feature
+- **✨ NEW FEATURE**: Added "Tutto il sito web" (Site-Wide) targeting option
+  - New match mode: `site_wide` that applies rules to ALL pages across the entire website
+  - Perfect for global banners, announcements, tracking codes, or site-wide widgets
+  - Shows up with 🌐 icon in the admin interface
+  - Automatically matches on every page, post, archive, and custom post type
+  - Target column in rules list displays "Tutto il sito" with site icon
+  - Available in filters for easy rule management
+- **🎯 Use Cases**:
+  - Cookie consent banners
+  - Global promotional banners
+  - Site-wide tracking scripts
+  - Emergency notifications
+  - GDPR compliance messages
+  - Global call-to-action elements
+- **📋 Admin Improvements**:
+  - Added to content type dropdown with intuitive 🌐 emoji
+  - Integrated into search/filter system
+  - Clear visual distinction in rules table
+- **Impact**: Provides maximum flexibility for site-wide content injection without needing multiple rules
 
 ### 2.4.0 - Security & Stability Release
 - **🐛 CRITICAL BUG FIXES**: Multiple critical bugs resolved
