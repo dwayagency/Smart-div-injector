@@ -1,12 +1,13 @@
 # Smart Div Injector
 
-**Version:** 2.5.0  
+**Version:** 2.5.1  
+**Stable tag:** 2.5.1  
 **Author:** DWAY SRL  
 **Author URI:** https://dway.agency  
 **License:** GPL-2.0+  
 **Requires at least:** WordPress 5.0  
 **Requires PHP:** 7.2  
-**Tested up to:** WordPress 6.4  
+**Tested up to:** 6.7  
 **Network:** Compatible with WordPress Multisite  
 
 ## Description
@@ -711,6 +712,17 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 - **No external dependencies** - Pure vanilla JavaScript
 
 ## Changelog
+
+### 2.5.1 - WordPress.org Compatibility Fix
+- **🔧 COMPATIBILITY FIX**: Removed heredoc/nowdoc syntax for WordPress.org compliance
+  - Converted heredoc JavaScript string to standard concatenated strings
+  - All code now uses standard string formatting compatible with WordPress Plugin Repository
+  - No functional changes - internal code formatting only
+- **📋 REPOSITORY REQUIREMENTS**:
+  - Added "Stable tag" field to README (required by WordPress.org)
+  - Updated "Tested up to" version to 6.7 (current WordPress version)
+  - Plugin now passes WordPress.org automated checks
+- **Impact**: Plugin is now ready for submission to WordPress Plugin Repository
 
 ### 2.5.0 - Site-Wide Targeting Feature
 - **✨ NEW FEATURE**: Added "Tutto il sito web" (Site-Wide) targeting option

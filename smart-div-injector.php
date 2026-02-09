@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Smart Div Injector
  * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple con varianti, modifica rapida, ricerca, filtri e paginazione.
- * Version: 2.5.0
+ * Version: 2.5.1
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  * License: GPL-2.0+
@@ -47,7 +47,7 @@ class Smart_Div_Injector {
             'sdi-admin-style', 
             plugins_url( 'admin-style.css', __FILE__ ), 
             [], 
-            '2.5.0'
+            '2.5.1'
         );
     }
     
@@ -2013,183 +2013,146 @@ class Smart_Div_Injector {
     private function get_inline_js(): string {
         // I payload vengono passati tramite wp_localize_script come variabile globale sdiPayloads
         // JavaScript inline formattato per leggibilità
-        $js = <<<'JS'
-(function(){
-  try {
-    // I dati sono passati da wp_localize_script nella variabile globale sdiPayloads
-    var rules = window.sdiPayloads || [];
-    
-    function ready(fn){ 
-      if(document.readyState !== 'loading'){ 
-        fn(); 
-      } else { 
-        document.addEventListener('DOMContentLoaded', fn); 
-      } 
-    }
-    
-    function insert(target, html, where){
-      if(!target) return;
-      
-      // Crea un contenitore temporaneo
-      var temp = document.createElement('div');
-      temp.innerHTML = html;
-      
-      // Estrae tutti gli elementi (non solo gli script)
-      var elements = Array.from(temp.childNodes);
-      
-      // Inserisci gli elementi in modo sequenziale, aspettando gli script esterni
-      insertSequentially(target, elements, where, 0);
-    }
-    
-    function insertSequentially(target, elements, where, index) {
-      if (index >= elements.length) return; // Fine della sequenza
-      
-      var el = elements[index];
-      var isExternalScript = el.nodeType === 1 && el.tagName === 'SCRIPT' && el.hasAttribute('src');
-      
-      // Funzione per continuare con il prossimo elemento
-      var continueNext = function() {
-        insertSequentially(target, elements, where, index + 1);
-      };
-      
-      try {
-        var newElement;
-        
-        if (el.nodeType === 1) {
-          newElement = cloneAndExecute(el);
-        } else {
-          newElement = el.cloneNode(true);
-        }
-        
-        // Inserisci l'elemento nella posizione corretta
-        switch(where){
-          case 'prepend':
-            target.insertBefore(newElement, target.firstChild);
-            break;
-          case 'before':
-            target.parentNode.insertBefore(newElement, target);
-                break;
-          case 'after':
-            target.parentNode.insertBefore(newElement, target.nextSibling);
-                break;
-          case 'replace':
-            if (index === 0) target.innerHTML = '';
-            target.appendChild(newElement);
-                break;
-          case 'append':
-          default:
-            target.appendChild(newElement);
-        }
-        
-        // Se è uno script esterno, aspetta che sia caricato
-        if (isExternalScript) {
-          newElement.onload = continueNext;
-          newElement.onerror = function() {
-            console.warn('Smart Div Injector: Errore nel caricamento dello script:', el.getAttribute('src'));
-            continueNext();
-          };
-        } else {
-          // Altrimenti continua subito (ma usa setTimeout per evitare problemi di stack)
-          setTimeout(continueNext, 0);
-        }
-      } catch(e) {
-        console.warn('Smart Div Injector: Errore nell\'inserimento dell\'elemento', e);
-        continueNext();
-      }
-    }
-    
-    function cloneAndExecute(element) {
-      // Se è uno script, crea una copia eseguibile
-      if (element.nodeType === 1 && element.tagName === 'SCRIPT') {
-        var script = document.createElement('script');
-        
-        // Copia tutti gli attributi in modo sicuro
-        Array.from(element.attributes).forEach(function(attr) {
-          try {
-            // Usa getAttribute per ottenere il valore non processato
-            var value = element.getAttribute(attr.name);
-            if (value !== null) {
-              script.setAttribute(attr.name, value);
-            }
-          } catch(e) {
-            console.warn('Smart Div Injector: Errore nel copiare attributo', attr.name, e);
-          }
-        });
-        
-        // Copia il contenuto dello script
-        if (element.textContent) {
-          script.textContent = element.textContent;
-        } else if (element.text) {
-          script.text = element.text;
-        }
-        
-        return script;
-      }
-      
-      // Per altri elementi, clona e processa ricorsivamente gli script al loro interno
-      var clone = element.cloneNode(false);
-      
-      Array.from(element.childNodes).forEach(function(child) {
-        if (child.nodeType === 1 && child.tagName === 'SCRIPT') {
-          clone.appendChild(cloneAndExecute(child));
-        } else if (child.nodeType === 1) {
-          clone.appendChild(cloneAndExecute(child));
-        } else {
-          clone.appendChild(child.cloneNode(true));
-        }
-      });
-      
-      return clone;
-    }
-    
-    ready(function(){
-      if (!rules || !Array.isArray(rules)) {
-        console.warn('Smart Div Injector: Nessuna regola valida da processare');
-        return;
-      }
-      
-      // Processa ogni regola
-      rules.forEach(function(rule, index){
-        try {
-          if (!rule || !rule.selector || !rule.code) {
-            console.warn('Smart Div Injector: Regola #' + (index + 1) + ' non valida');
-            return;
-        }
-
-          var el = document.querySelector(rule.selector);
-          if(!el){ 
-            console.warn('Smart Div Injector: Selettore non trovato:', rule.selector);
-            return; 
-          }
-          
-          // Decodifica il codice da base64 con gestione UTF-8
-          var decodedCode;
-          try {
-            decodedCode = decodeURIComponent(atob(rule.code).split('').map(function(c) {
-              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-            }).join(''));
-          } catch(decodeError) {
-            // Fallback: decodifica base64 semplice se UTF-8 fallisce
-            console.warn('Smart Div Injector: Errore decodifica UTF-8, uso fallback per regola #' + (index + 1));
-            try {
-              decodedCode = atob(rule.code);
-            } catch(base64Error) {
-              console.error('Smart Div Injector: Impossibile decodificare la regola #' + (index + 1), base64Error);
-              return;
-            }
-          }
-          
-          insert(el, decodedCode, rule.position || 'append');
-        } catch(e) { 
-          console.warn('Smart Div Injector: Errore nell\'iniezione della regola #' + (index + 1), e); 
-        }
-      });
-    });
-  } catch(globalError) {
-    console.error('Smart Div Injector: Errore critico:', globalError);
-  }
-})();
-JS;
+        $js = '(function(){' . "\n";
+        $js .= '  try {' . "\n";
+        $js .= '    var rules = window.sdiPayloads || [];' . "\n";
+        $js .= '    ' . "\n";
+        $js .= '    function ready(fn){ ' . "\n";
+        $js .= '      if(document.readyState !== \'loading\'){ ' . "\n";
+        $js .= '        fn(); ' . "\n";
+        $js .= '      } else { ' . "\n";
+        $js .= '        document.addEventListener(\'DOMContentLoaded\', fn); ' . "\n";
+        $js .= '      } ' . "\n";
+        $js .= '    }' . "\n";
+        $js .= '    ' . "\n";
+        $js .= '    function insert(target, html, where){' . "\n";
+        $js .= '      if(!target) return;' . "\n";
+        $js .= '      var temp = document.createElement(\'div\');' . "\n";
+        $js .= '      temp.innerHTML = html;' . "\n";
+        $js .= '      var elements = Array.from(temp.childNodes);' . "\n";
+        $js .= '      insertSequentially(target, elements, where, 0);' . "\n";
+        $js .= '    }' . "\n";
+        $js .= '    ' . "\n";
+        $js .= '    function insertSequentially(target, elements, where, index) {' . "\n";
+        $js .= '      if (index >= elements.length) return;' . "\n";
+        $js .= '      var el = elements[index];' . "\n";
+        $js .= '      var isExternalScript = el.nodeType === 1 && el.tagName === \'SCRIPT\' && el.hasAttribute(\'src\');' . "\n";
+        $js .= '      var continueNext = function() {' . "\n";
+        $js .= '        insertSequentially(target, elements, where, index + 1);' . "\n";
+        $js .= '      };' . "\n";
+        $js .= '      try {' . "\n";
+        $js .= '        var newElement;' . "\n";
+        $js .= '        if (el.nodeType === 1) {' . "\n";
+        $js .= '          newElement = cloneAndExecute(el);' . "\n";
+        $js .= '        } else {' . "\n";
+        $js .= '          newElement = el.cloneNode(true);' . "\n";
+        $js .= '        }' . "\n";
+        $js .= '        switch(where){' . "\n";
+        $js .= '          case \'prepend\':' . "\n";
+        $js .= '            target.insertBefore(newElement, target.firstChild);' . "\n";
+        $js .= '            break;' . "\n";
+        $js .= '          case \'before\':' . "\n";
+        $js .= '            target.parentNode.insertBefore(newElement, target);' . "\n";
+        $js .= '            break;' . "\n";
+        $js .= '          case \'after\':' . "\n";
+        $js .= '            target.parentNode.insertBefore(newElement, target.nextSibling);' . "\n";
+        $js .= '            break;' . "\n";
+        $js .= '          case \'replace\':' . "\n";
+        $js .= '            if (index === 0) target.innerHTML = \'\';' . "\n";
+        $js .= '            target.appendChild(newElement);' . "\n";
+        $js .= '            break;' . "\n";
+        $js .= '          case \'append\':' . "\n";
+        $js .= '          default:' . "\n";
+        $js .= '            target.appendChild(newElement);' . "\n";
+        $js .= '        }' . "\n";
+        $js .= '        if (isExternalScript) {' . "\n";
+        $js .= '          newElement.onload = continueNext;' . "\n";
+        $js .= '          newElement.onerror = function() {' . "\n";
+        $js .= '            console.warn(\'Smart Div Injector: Errore nel caricamento dello script:\', el.getAttribute(\'src\'));' . "\n";
+        $js .= '            continueNext();' . "\n";
+        $js .= '          };' . "\n";
+        $js .= '        } else {' . "\n";
+        $js .= '          setTimeout(continueNext, 0);' . "\n";
+        $js .= '        }' . "\n";
+        $js .= '      } catch(e) {' . "\n";
+        $js .= '        console.warn(\'Smart Div Injector: Errore nell\\\'inserimento dell\\\'elemento\', e);' . "\n";
+        $js .= '        continueNext();' . "\n";
+        $js .= '      }' . "\n";
+        $js .= '    }' . "\n";
+        $js .= '    ' . "\n";
+        $js .= '    function cloneAndExecute(element) {' . "\n";
+        $js .= '      if (element.nodeType === 1 && element.tagName === \'SCRIPT\') {' . "\n";
+        $js .= '        var script = document.createElement(\'script\');' . "\n";
+        $js .= '        Array.from(element.attributes).forEach(function(attr) {' . "\n";
+        $js .= '          try {' . "\n";
+        $js .= '            var value = element.getAttribute(attr.name);' . "\n";
+        $js .= '            if (value !== null) {' . "\n";
+        $js .= '              script.setAttribute(attr.name, value);' . "\n";
+        $js .= '            }' . "\n";
+        $js .= '          } catch(e) {' . "\n";
+        $js .= '            console.warn(\'Smart Div Injector: Errore nel copiare attributo\', attr.name, e);' . "\n";
+        $js .= '          }' . "\n";
+        $js .= '        });' . "\n";
+        $js .= '        if (element.textContent) {' . "\n";
+        $js .= '          script.textContent = element.textContent;' . "\n";
+        $js .= '        } else if (element.text) {' . "\n";
+        $js .= '          script.text = element.text;' . "\n";
+        $js .= '        }' . "\n";
+        $js .= '        return script;' . "\n";
+        $js .= '      }' . "\n";
+        $js .= '      var clone = element.cloneNode(false);' . "\n";
+        $js .= '      Array.from(element.childNodes).forEach(function(child) {' . "\n";
+        $js .= '        if (child.nodeType === 1 && child.tagName === \'SCRIPT\') {' . "\n";
+        $js .= '          clone.appendChild(cloneAndExecute(child));' . "\n";
+        $js .= '        } else if (child.nodeType === 1) {' . "\n";
+        $js .= '          clone.appendChild(cloneAndExecute(child));' . "\n";
+        $js .= '        } else {' . "\n";
+        $js .= '          clone.appendChild(child.cloneNode(true));' . "\n";
+        $js .= '        }' . "\n";
+        $js .= '      });' . "\n";
+        $js .= '      return clone;' . "\n";
+        $js .= '    }' . "\n";
+        $js .= '    ' . "\n";
+        $js .= '    ready(function(){' . "\n";
+        $js .= '      if (!rules || !Array.isArray(rules)) {' . "\n";
+        $js .= '        console.warn(\'Smart Div Injector: Nessuna regola valida da processare\');' . "\n";
+        $js .= '        return;' . "\n";
+        $js .= '      }' . "\n";
+        $js .= '      rules.forEach(function(rule, index){' . "\n";
+        $js .= '        try {' . "\n";
+        $js .= '          if (!rule || !rule.selector || !rule.code) {' . "\n";
+        $js .= '            console.warn(\'Smart Div Injector: Regola #\' + (index + 1) + \' non valida\');' . "\n";
+        $js .= '            return;' . "\n";
+        $js .= '          }' . "\n";
+        $js .= '          var el = document.querySelector(rule.selector);' . "\n";
+        $js .= '          if(!el){ ' . "\n";
+        $js .= '            console.warn(\'Smart Div Injector: Selettore non trovato:\', rule.selector);' . "\n";
+        $js .= '            return; ' . "\n";
+        $js .= '          }' . "\n";
+        $js .= '          var decodedCode;' . "\n";
+        $js .= '          try {' . "\n";
+        $js .= '            decodedCode = decodeURIComponent(atob(rule.code).split(\'\').map(function(c) {' . "\n";
+        $js .= '              return \'%\' + (\'00\' + c.charCodeAt(0).toString(16)).slice(-2);' . "\n";
+        $js .= '            }).join(\'\'));' . "\n";
+        $js .= '          } catch(decodeError) {' . "\n";
+        $js .= '            console.warn(\'Smart Div Injector: Errore decodifica UTF-8, uso fallback per regola #\' + (index + 1));' . "\n";
+        $js .= '            try {' . "\n";
+        $js .= '              decodedCode = atob(rule.code);' . "\n";
+        $js .= '            } catch(base64Error) {' . "\n";
+        $js .= '              console.error(\'Smart Div Injector: Impossibile decodificare la regola #\' + (index + 1), base64Error);' . "\n";
+        $js .= '              return;' . "\n";
+        $js .= '            }' . "\n";
+        $js .= '          }' . "\n";
+        $js .= '          insert(el, decodedCode, rule.position || \'append\');' . "\n";
+        $js .= '        } catch(e) { ' . "\n";
+        $js .= '          console.warn(\'Smart Div Injector: Errore nell\\\'iniezione della regola #\' + (index + 1), e); ' . "\n";
+        $js .= '        }' . "\n";
+        $js .= '      });' . "\n";
+        $js .= '    });' . "\n";
+        $js .= '  } catch(globalError) {' . "\n";
+        $js .= '    console.error(\'Smart Div Injector: Errore critico:\', globalError);' . "\n";
+        $js .= '  }' . "\n";
+        $js .= '})();';
         
         return $js;
     }
