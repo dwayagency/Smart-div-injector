@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Smart Div Injector
  * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple con varianti, modifica rapida, ricerca, filtri e paginazione.
- * Version: 2.3.3
+ * Version: 2.4.0
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  * License: GPL-2.0+
@@ -47,7 +47,7 @@ class Smart_Div_Injector {
             'sdi-admin-style', 
             plugins_url( 'admin-style.css', __FILE__ ), 
             [], 
-            '2.3.3'
+            '2.4.0'
         );
     }
     
@@ -1650,8 +1650,8 @@ class Smart_Div_Injector {
                         switch_to_blog( $site->blog_id );
                         $site_name = get_bloginfo( 'name' );
                         $site_url = get_bloginfo( 'url' );
-                        $opts = $this->get_options();
-                        $is_configured = ! empty( $opts['selector'] ) && ! empty( $opts['code'] );
+                        $site_rules = $this->get_rules();
+                        $is_configured = ! empty( $site_rules );
                         $admin_url = get_admin_url( $site->blog_id, 'admin.php?page=smart-div-injector' );
                         restore_current_blog();
                         ?>
@@ -2087,7 +2087,7 @@ class Smart_Div_Injector {
     
     function cloneAndExecute(element) {
       // Se è uno script, crea una copia eseguibile
-      if (element.tagName === 'SCRIPT') {
+      if (element.nodeType === 1 && element.tagName === 'SCRIPT') {
         var script = document.createElement('script');
         
         // Copia tutti gli attributi in modo sicuro
@@ -2149,10 +2149,22 @@ class Smart_Div_Injector {
             return; 
           }
           
-          // Decodifica il codice da base64
-          var decodedCode = decodeURIComponent(atob(rule.code).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-          }).join(''));
+          // Decodifica il codice da base64 con gestione UTF-8
+          var decodedCode;
+          try {
+            decodedCode = decodeURIComponent(atob(rule.code).split('').map(function(c) {
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+          } catch(decodeError) {
+            // Fallback: decodifica base64 semplice se UTF-8 fallisce
+            console.warn('Smart Div Injector: Errore decodifica UTF-8, uso fallback per regola #' + (index + 1));
+            try {
+              decodedCode = atob(rule.code);
+            } catch(base64Error) {
+              console.error('Smart Div Injector: Impossibile decodificare la regola #' + (index + 1), base64Error);
+              return;
+            }
+          }
           
           insert(el, decodedCode, rule.position || 'append');
         } catch(e) { 

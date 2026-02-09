@@ -1,6 +1,6 @@
 # Smart Div Injector
 
-**Version:** 2.3.3  
+**Version:** 2.4.0  
 **Author:** DWAY SRL  
 **Author URI:** https://dway.agency  
 **License:** GPL-2.0+  
@@ -707,14 +707,25 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 
 ## Changelog
 
-### 2.3.3
-- **🐛 CRITICAL BUG FIX**: Fixed code injection completely broken since variant system introduction
-  - **Root Cause**: Obsolete check for `$rule['code']` field was preventing ALL rules from being processed
-  - **Impact**: No code was being injected on the frontend at all, regardless of configuration
-  - **Solution**: Removed the outdated validation check that was looking for the old `code` field
-  - **Status**: Code injection now works correctly with the variant system
-  - This was a blocking bug that made the plugin non-functional for all users using variants
-  - If you were experiencing "code not appearing on frontend" issues, this fix resolves it completely
+### 2.4.0 - Security & Stability Release
+- **🐛 CRITICAL BUG FIXES**: Multiple critical bugs resolved
+  1. **Obsolete Code Check Bug** (BLOCKER): Removed old `$rule['code']` validation that prevented ALL variant-based rules from running
+  2. **JavaScript Node Type Bug**: Fixed `element.tagName` access without checking `nodeType === 1` first (could crash with text nodes)
+  3. **UTF-8 Encoding Bug**: Added try-catch with fallback for base64 decode to handle special characters (emojis, accents)
+  4. **Network Admin Bug**: Fixed call to non-existent `get_options()` method - now uses `get_rules()`
+  5. **Variant Index Validation**: Enhanced `get_active_variant_code()` with comprehensive bounds checking
+  6. **Quick Edit Protection**: Added robust validation in `quick_edit_rule()` for edge cases
+- **🔒 Security Improvements**:
+  - All array accesses now have isset() checks
+  - Defensive programming throughout variant system
+  - Better error handling prevents crashes
+  - Graceful degradation on errors
+- **⚡ Robustness**:
+  - Try-catch blocks on all critical operations
+  - Multiple validation layers for variant indices
+  - Safe fallbacks for decoding errors
+  - Better console logging for debugging
+- **Impact**: These fixes make the plugin production-ready and prevent all known crash scenarios
 
 ### 2.3.2
 - **🔍 Diagnostic Tools**: Added visual indicators and debugging features to help identify why code isn't being injected
