@@ -2,7 +2,7 @@
 Contributors: dwaysrl
 Tags: code injection, html injection, javascript, css, content injection
 Requires at least: 5.0
-Tested up to: 6.9
+Tested up to: 6.9.1
 Stable tag: 2.5.1
 Requires PHP: 7.2
 License: GPLv2 or later

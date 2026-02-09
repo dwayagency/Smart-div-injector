@@ -7,7 +7,7 @@
 **License:** GPL-2.0+  
 **Requires at least:** WordPress 5.0  
 **Requires PHP:** 7.2  
-**Tested up to:** 6.9  
+**Tested up to:** 6.9.1  
 **Network:** Compatible with WordPress Multisite  
 
 ## Description
