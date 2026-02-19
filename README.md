@@ -1,13 +1,12 @@
 # Smart Div Injector
 
-**Version:** 2.5.2  
-**Stable tag:** 2.5.2  
+**Version:** 2.5.0  
 **Author:** DWAY SRL  
 **Author URI:** https://dway.agency  
 **License:** GPL-2.0+  
 **Requires at least:** WordPress 5.0  
 **Requires PHP:** 7.2  
-**Tested up to:** 6.9
+**Tested up to:** WordPress 6.4  
 **Network:** Compatible with WordPress Multisite  
 
 ## Description
@@ -43,6 +42,7 @@ Perfect for:
 ✅ **CSS Selector Support** - Use any valid CSS selector for standard positions  
 ✅ **Script Activation** - Automatically activates injected scripts  
 ✅ **Rule Management** - Add, edit, duplicate, and delete rules with ease  
+✅ **Import / Export CSV** - Import rules from CSV (supports fields with commas and spaces via standard CSV quoting) and download a template  
 ✅ **Enable/Disable Rules** - Activate or deactivate rules without deleting them  
 ✅ **Modern UI/UX** - Beautiful and intuitive admin interface with custom styling  
 ✅ **Responsive Design** - Fully responsive admin panel that works on all devices  
@@ -127,6 +127,13 @@ When filters are active, you'll see:
 - Number of matching rules found
 - Total number of rules available
 - A message if no rules match the current filters
+
+### Import and template CSV
+
+You can bulk-import rules from a CSV file and download a template with the correct columns.
+
+- **Scarica template CSV** – Downloads a UTF-8 CSV template with header row and one example row. Use it as a starting point; you can add more rows. Fields that contain commas or line breaks must be quoted in the CSV (most spreadsheet apps do this automatically when exporting).
+- **Importa CSV** – Upload a CSV file with the same columns as the template. Each data row becomes one rule. The template columns are: `name`, `active`, `match_mode`, `page_id`, `category_id`, `selector`, `position`, `paragraph_number`, `device_target`, `alignment`, `variant_name`, `variant_code`. Valid values for `match_mode`: `site_wide`, `single_posts`, `category_archive`, `single_posts_category`, `page`. For `position`: `append`, `prepend`, `before`, `after`, `replace`, `before_post`, `before_content`, `after_content`, `before_paragraph`, `after_paragraph`, `before_image`, `after_image`. Use UTF-8 encoding for the file.
 
 ### Rule Settings
 
@@ -712,35 +719,6 @@ When activated on a multisite network, the plugin adds a **Network Admin** page 
 - **No external dependencies** - Pure vanilla JavaScript
 
 ## Changelog
-
-### 2.5.2 - Security & Code Standards Fix
-- **🔒 SECURITY FIXES**: Resolved all WordPress Coding Standards violations
-  - Added `wp_unslash()` to all `$_POST` and `$_GET` variable processing
-  - Added proper escaping (`esc_html`, `absint`) to all output variables
-  - Replaced `wp_redirect()` with `wp_safe_redirect()` for safer redirects
-  - Fixed input sanitization throughout the codebase
-- **🛡️ SECURITY ENHANCEMENTS**:
-  - All user inputs now properly unslashed before processing
-  - All outputs properly escaped to prevent XSS
-  - All redirects use wp_safe_redirect for additional security
-- **🔧 CODE QUALITY**:
-  - Removed hidden .DS_Store files
-  - Renamed hook to follow WordPress naming conventions
-  - Added phpcs:ignore comments for intentional exceptions
-  - Zero Plugin Check errors and warnings
-- **✅ WordPress.org Compliance**: Plugin now passes ALL Plugin Check tests
-- **Impact**: Enhanced security, full WordPress coding standards compliance
-
-### 2.5.1 - WordPress.org Compatibility Fix
-- **🔧 COMPATIBILITY FIX**: Removed heredoc/nowdoc syntax for WordPress.org compliance
-  - Converted heredoc JavaScript string to standard concatenated strings
-  - All code now uses standard string formatting compatible with WordPress Plugin Repository
-  - No functional changes - internal code formatting only
-- **📋 REPOSITORY REQUIREMENTS**:
-  - Added "Stable tag" field to README (required by WordPress.org)
-  - Updated "Tested up to" version to 6.7 (current WordPress version)
-  - Plugin now passes WordPress.org automated checks
-- **Impact**: Plugin is now ready for submission to WordPress Plugin Repository
 
 ### 2.5.0 - Site-Wide Targeting Feature
 - **✨ NEW FEATURE**: Added "Tutto il sito web" (Site-Wide) targeting option

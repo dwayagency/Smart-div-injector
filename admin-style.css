@@ -1,6 +1,6 @@
 /**
  * Smart Div Injector - Admin Styles
- * Version: 2.5.2
+ * Version: 2.5.0
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  */
@@ -54,6 +54,20 @@
     font-size: 32px;
     width: 32px;
     height: 32px;
+}
+
+.sdi-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.sdi-import-form {
+    margin: 0;
+}
+.sdi-import-form input[type="file"]:focus + label,
+.sdi-import-form label:focus-within {
+    outline: 1px solid var(--sdi-primary);
 }
 
 .sdi-add-button {

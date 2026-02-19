@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Smart Div Injector
  * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple con varianti, modifica rapida, ricerca, filtri e paginazione.
- * Version: 2.5.2
+ * Version: 2.5.0
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  * License: GPL-2.0+
@@ -47,7 +47,7 @@ class Smart_Div_Injector {
             'sdi-admin-style', 
             plugins_url( 'admin-style.css', __FILE__ ), 
             [], 
-            '2.5.2'
+            '2.5.0'
         );
     }
     
@@ -126,60 +126,197 @@ class Smart_Div_Injector {
             return;
         }
         
-        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Nonce verification handles sanitization internally
-        if ( isset( $_POST['sdi_nonce'] ) && ! wp_verify_nonce( wp_unslash( $_POST['sdi_nonce'] ), 'sdi_rule_action' ) ) {
+        if ( isset( $_POST['sdi_nonce'] ) && ! wp_verify_nonce( $_POST['sdi_nonce'], 'sdi_rule_action' ) ) {
             wp_die( 'Nonce verification failed' );
         }
         
         // Aggiungi nuova regola
         if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'add' ) {
             $this->save_rule_from_post();
-            wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=added' ) );
+            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=added' ) );
             exit;
         }
         
         // Modifica regola esistente
         if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'edit' && isset( $_POST['rule_id'] ) ) {
-            $this->update_rule_from_post( sanitize_text_field( wp_unslash( $_POST['rule_id'] ) ) );
-            wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=updated' ) );
+            $this->update_rule_from_post( $_POST['rule_id'] );
+            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=updated' ) );
             exit;
         }
         
         // Elimina regola
         if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' && isset( $_GET['rule_id'] ) ) {
-            $rule_id = sanitize_text_field( wp_unslash( $_GET['rule_id'] ) );
-            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'delete_rule_' . $rule_id ) ) {
+            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'delete_rule_' . $_GET['rule_id'] ) ) {
                 wp_die( 'Nonce verification failed' );
             }
-            $this->delete_rule( $rule_id );
-            wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=deleted' ) );
+            $this->delete_rule( $_GET['rule_id'] );
+            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=deleted' ) );
             exit;
         }
         
         // Duplica regola
         if ( isset( $_GET['action'] ) && $_GET['action'] === 'duplicate' && isset( $_GET['rule_id'] ) ) {
-            $rule_id = sanitize_text_field( wp_unslash( $_GET['rule_id'] ) );
-            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'duplicate_rule_' . $rule_id ) ) {
+            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'duplicate_rule_' . $_GET['rule_id'] ) ) {
                 wp_die( 'Nonce verification failed' );
             }
-            $this->duplicate_rule( $rule_id );
-            wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=duplicated' ) );
+            $this->duplicate_rule( $_GET['rule_id'] );
+            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=duplicated' ) );
             exit;
         }
         
         // Modifica rapida (quick edit)
         if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'quick_edit' && isset( $_POST['rule_id'] ) ) {
-            $this->quick_edit_rule( sanitize_text_field( wp_unslash( $_POST['rule_id'] ) ) );
-            wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=quick_updated' ) );
+            $this->quick_edit_rule( $_POST['rule_id'] );
+            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=quick_updated' ) );
             exit;
         }
+        
+        // Scarica template CSV
+        if ( isset( $_GET['action'] ) && $_GET['action'] === 'download_csv_template' ) {
+            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'sdi_download_csv_template' ) ) {
+                wp_die( 'Nonce verification failed' );
+            }
+            $this->download_csv_template();
+            exit;
+        }
+        
+        // Importa CSV
+        if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'import_csv' && ! empty( $_FILES['sdi_csv_file']['tmp_name'] ) ) {
+            $result = $this->import_rules_from_csv( $_FILES['sdi_csv_file'] );
+            if ( isset( $result['imported'] ) && $result['imported'] > 0 ) {
+                $msg = $result['imported'] === 1 ? 'imported_one' : 'imported_many';
+                wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=' . $msg . '&count=' . $result['imported'] ) );
+            } elseif ( ! empty( $result['errors'] ) ) {
+                wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=import_errors&errors=' . urlencode( wp_json_encode( $result['errors'] ) ) ) );
+            } else {
+                wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=imported_zero' ) );
+            }
+            exit;
+        }
+    }
+    
+    /**
+     * Scarica il file CSV template per l'import
+     */
+    private function download_csv_template() {
+        $filename = 'smart-div-injector-template.csv';
+        header( 'Content-Type: text/csv; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+        header( 'Cache-Control: no-cache, no-store, must-revalidate' );
+        header( 'Pragma: no-public' );
+        header( 'Expires: 0' );
+        $out = fopen( 'php://output', 'w' );
+        if ( $out === false ) {
+            return;
+        }
+        // BOM UTF-8 per Excel
+        fprintf( $out, chr(0xEF) . chr(0xBB) . chr(0xBF) );
+        $headers = [
+            'name',
+            'active',
+            'match_mode',
+            'page_id',
+            'category_id',
+            'selector',
+            'position',
+            'paragraph_number',
+            'device_target',
+            'alignment',
+            'variant_name',
+            'variant_code',
+        ];
+        fputcsv( $out, $headers );
+        // Riga di esempio con valori validi
+        fputcsv( $out, [
+            'Banner Contatti',
+            '1',
+            'site_wide',
+            '0',
+            '0',
+            '#main',
+            'append',
+            '1',
+            'both',
+            'none',
+            'Variante 1',
+            '<div class="banner">Testo con spazi e virgole, va bene.</div>',
+        ] );
+        fclose( $out );
+    }
+    
+    /**
+     * Importa regole da file CSV (supporta campi con virgole e spazi tramite quoting CSV)
+     */
+    private function import_rules_from_csv( $file ) {
+        $errors = [];
+        $imported = 0;
+        $tmp = isset( $file['tmp_name'] ) ? $file['tmp_name'] : '';
+        if ( ! $tmp || ! is_uploaded_file( $tmp ) ) {
+            $errors[] = __( 'File non valido o non caricato.', 'smart-div-injector' );
+            return [ 'imported' => 0, 'errors' => $errors ];
+        }
+        $handle = fopen( $tmp, 'r' );
+        if ( $handle === false ) {
+            $errors[] = __( 'Impossibile aprire il file CSV.', 'smart-div-injector' );
+            return [ 'imported' => 0, 'errors' => $errors ];
+        }
+        // BOM UTF-8
+        $bom = fread( $handle, 3 );
+        if ( $bom !== chr(0xEF) . chr(0xBB) . chr(0xBF) ) {
+            rewind( $handle );
+        }
+        $header = fgetcsv( $handle );
+        if ( $header === false ) {
+            fclose( $handle );
+            $errors[] = __( 'Il file CSV è vuoto o non valido.', 'smart-div-injector' );
+            return [ 'imported' => 0, 'errors' => $errors ];
+        }
+        $header = array_map( 'trim', $header );
+        $rules = $this->get_rules();
+        $row_num = 1;
+        while ( ( $row = fgetcsv( $handle ) ) !== false ) {
+            $row_num++;
+            if ( count( $row ) < 2 ) {
+                continue;
+            }
+            $assoc = array_combine( $header, array_pad( $row, count( $header ), '' ) );
+            if ( $assoc === false ) {
+                $assoc = [];
+                foreach ( $header as $i => $key ) {
+                    $assoc[ $key ] = isset( $row[ $i ] ) ? $row[ $i ] : '';
+                }
+            }
+            $data = [
+                'name'              => isset( $assoc['name'] ) ? $assoc['name'] : 'Regola importata ' . $row_num,
+                'active'            => ( isset( $assoc['active'] ) && ( $assoc['active'] === '1' || strtolower( $assoc['active'] ) === 'sì' || strtolower( $assoc['active'] ) === 'si' ) ) ? '1' : '0',
+                'match_mode'        => isset( $assoc['match_mode'] ) ? trim( $assoc['match_mode'] ) : 'single_posts',
+                'page_id'           => isset( $assoc['page_id'] ) ? absint( $assoc['page_id'] ) : 0,
+                'category_id'       => isset( $assoc['category_id'] ) ? absint( $assoc['category_id'] ) : 0,
+                'selector'          => isset( $assoc['selector'] ) ? trim( $assoc['selector'] ) : '',
+                'position'          => isset( $assoc['position'] ) ? trim( $assoc['position'] ) : 'append',
+                'paragraph_number'  => isset( $assoc['paragraph_number'] ) ? absint( $assoc['paragraph_number'] ) : 1,
+                'device_target'     => isset( $assoc['device_target'] ) ? trim( $assoc['device_target'] ) : 'both',
+                'alignment'         => isset( $assoc['alignment'] ) ? trim( $assoc['alignment'] ) : 'none',
+                'active_variant'    => 0,
+                'variant_names'     => [ isset( $assoc['variant_name'] ) ? trim( $assoc['variant_name'] ) : 'Variante 1' ],
+                'variant_codes'     => [ isset( $assoc['variant_code'] ) ? $assoc['variant_code'] : '' ],
+            ];
+            $rule = $this->sanitize_rule_data( $data );
+            $rule_id = $this->generate_rule_id();
+            $rules[ $rule_id ] = $rule;
+            $imported++;
+        }
+        fclose( $handle );
+        if ( $imported > 0 ) {
+            $this->save_rules( $rules );
+        }
+        return [ 'imported' => $imported, 'errors' => $errors ];
     }
     
     /**
      * Salva una nuova regola dai dati POST
      */
     private function save_rule_from_post() {
-        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified in handle_actions before calling this function
         $rule = $this->sanitize_rule_data( $_POST );
         $rule_id = $this->generate_rule_id();
         
@@ -192,7 +329,6 @@ class Smart_Div_Injector {
      * Aggiorna una regola esistente
      */
     private function update_rule_from_post( $rule_id ) {
-        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified in handle_actions before calling this function
         $rule = $this->sanitize_rule_data( $_POST );
         
         $rules = $this->get_rules();
@@ -239,36 +375,33 @@ class Smart_Div_Injector {
         
         $rule = $rules[ $rule_id ];
         
-        // phpcs:disable WordPress.Security.NonceVerification.Missing -- Nonce verified in handle_actions before calling this function
         // Aggiorna solo i campi modificabili tramite quick edit
         if ( isset( $_POST['name'] ) ) {
-            $rule['name'] = sanitize_text_field( wp_unslash( $_POST['name'] ) );
+            $rule['name'] = sanitize_text_field( $_POST['name'] );
         }
         
         if ( isset( $_POST['active'] ) ) {
-            $rule['active'] = sanitize_text_field( wp_unslash( $_POST['active'] ) ) === '1';
+            $rule['active'] = $_POST['active'] === '1';
         } else {
             $rule['active'] = false;
         }
         
         if ( isset( $_POST['device_target'] ) ) {
             $valid_devices = [ 'both', 'desktop', 'mobile' ];
-            $device = sanitize_text_field( wp_unslash( $_POST['device_target'] ) );
-            if ( in_array( $device, $valid_devices, true ) ) {
-                $rule['device_target'] = $device;
+            if ( in_array( $_POST['device_target'], $valid_devices, true ) ) {
+                $rule['device_target'] = $_POST['device_target'];
             }
         }
         
         if ( isset( $_POST['alignment'] ) ) {
             $valid_alignments = [ 'none', 'left', 'right', 'center' ];
-            $alignment = sanitize_text_field( wp_unslash( $_POST['alignment'] ) );
-            if ( in_array( $alignment, $valid_alignments, true ) ) {
-                $rule['alignment'] = $alignment;
+            if ( in_array( $_POST['alignment'], $valid_alignments, true ) ) {
+                $rule['alignment'] = $_POST['alignment'];
             }
         }
         
         if ( isset( $_POST['active_variant'] ) ) {
-            $active_variant = absint( wp_unslash( $_POST['active_variant'] ) );
+            $active_variant = absint( $_POST['active_variant'] );
             $variants = $rule['variants'] ?? [];
             
             // Verifica che l'indice sia valido
@@ -276,7 +409,6 @@ class Smart_Div_Injector {
                 $rule['active_variant'] = $active_variant;
             }
         }
-        // phpcs:enable WordPress.Security.NonceVerification.Missing
         
         $rules[ $rule_id ] = $rule;
         $this->save_rules( $rules );
@@ -466,16 +598,14 @@ class Smart_Div_Injector {
             return;
         }
         
-        // phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET parameters for display only, nonce verified for any action in handle_actions
         // Determina quale vista mostrare
         if ( isset( $_GET['action'] ) && $_GET['action'] === 'edit' && isset( $_GET['rule_id'] ) ) {
-            $this->render_edit_rule_page( sanitize_text_field( wp_unslash( $_GET['rule_id'] ) ) );
+            $this->render_edit_rule_page( $_GET['rule_id'] );
         } elseif ( isset( $_GET['action'] ) && $_GET['action'] === 'add' ) {
             $this->render_add_rule_page();
         } else {
             $this->render_rules_list_page();
         }
-        // phpcs:enable WordPress.Security.NonceVerification.Recommended
     }
     
     /**
@@ -484,14 +614,13 @@ class Smart_Div_Injector {
     private function render_rules_list_page() {
         $all_rules = $this->get_rules();
         
-        // phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET parameters for display/filtering only, no data modification
         // Parametri di ricerca, filtri e paginazione
-        $search = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
-        $filter_status = isset( $_GET['filter_status'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_status'] ) ) : '';
-        $filter_type = isset( $_GET['filter_type'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_type'] ) ) : '';
-        $filter_device = isset( $_GET['filter_device'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_device'] ) ) : '';
-        $per_page = isset( $_GET['per_page'] ) ? absint( wp_unslash( $_GET['per_page'] ) ) : 20;
-        $paged = isset( $_GET['paged'] ) ? max( 1, absint( wp_unslash( $_GET['paged'] ) ) ) : 1;
+        $search = isset( $_GET['s'] ) ? sanitize_text_field( $_GET['s'] ) : '';
+        $filter_status = isset( $_GET['filter_status'] ) ? sanitize_text_field( $_GET['filter_status'] ) : '';
+        $filter_type = isset( $_GET['filter_type'] ) ? sanitize_text_field( $_GET['filter_type'] ) : '';
+        $filter_device = isset( $_GET['filter_device'] ) ? sanitize_text_field( $_GET['filter_device'] ) : '';
+        $per_page = isset( $_GET['per_page'] ) ? absint( $_GET['per_page'] ) : 20;
+        $paged = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
         
         // Applica filtri
         $filtered_rules = $all_rules;
@@ -537,11 +666,10 @@ class Smart_Div_Injector {
         $rules = array_slice( $filtered_rules, $offset, $per_page, true );
         
         // Messaggi di conferma
-        $message = isset( $_GET['message'] ) ? sanitize_text_field( wp_unslash( $_GET['message'] ) ) : '';
+        $message = isset( $_GET['message'] ) ? $_GET['message'] : '';
         
         // Costruisci URL base per mantenere i filtri
-        $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
-        $base_url = remove_query_arg( [ 'message', 'paged' ], $request_uri );
+        $base_url = remove_query_arg( [ 'message', 'paged' ], $_SERVER['REQUEST_URI'] );
         
         ?>
         <div class="wrap">
@@ -550,10 +678,32 @@ class Smart_Div_Injector {
                     <span class="dashicons dashicons-admin-generic"></span>
                     Smart Div Injector
                 </h1>
-                <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector&action=add' ) ); ?>" class="button sdi-add-button">
-                    <span class="dashicons dashicons-plus-alt"></span>
-                    Aggiungi Nuova Regola
-                </a>
+                <div class="sdi-header-actions">
+                    <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=download_csv_template' ), 'sdi_download_csv_template', '_wpnonce' ) ); ?>" class="button">
+                        <span class="dashicons dashicons-download"></span>
+                        Scarica template CSV
+                    </a>
+                    <form method="post" action="" enctype="multipart/form-data" class="sdi-import-form" style="display:inline;">
+                        <?php wp_nonce_field( 'sdi_rule_action', 'sdi_nonce' ); ?>
+                        <input type="hidden" name="sdi_action" value="import_csv">
+                        <label for="sdi-csv-file" class="button">
+                            <span class="dashicons dashicons-upload"></span>
+                            Importa CSV
+                        </label>
+                        <input type="file" id="sdi-csv-file" name="sdi_csv_file" accept=".csv" style="display:none;" required>
+                        <script>
+                        (function(){
+                            var f = document.getElementById('sdi-csv-file');
+                            var form = f && f.closest('form');
+                            if (f && form) f.addEventListener('change', function(){ if (f.files.length) form.submit(); });
+                        })();
+                        </script>
+                    </form>
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector&action=add' ) ); ?>" class="button sdi-add-button">
+                        <span class="dashicons dashicons-plus-alt"></span>
+                        Aggiungi Nuova Regola
+                    </a>
+                </div>
             </div>
             
             <?php if ( is_multisite() ) : ?>
@@ -586,6 +736,31 @@ class Smart_Div_Injector {
             <?php elseif ( $message === 'quick_updated' ) : ?>
                 <div class="sdi-notice success">
                     <p><strong>✓ Modifica rapida completata con successo!</strong></p>
+                </div>
+            <?php elseif ( $message === 'imported_one' ) : ?>
+                <div class="sdi-notice success">
+                    <p><strong>✓ 1 regola importata con successo.</strong></p>
+                </div>
+            <?php elseif ( $message === 'imported_many' ) : ?>
+                <div class="sdi-notice success">
+                    <p><strong>✓ <?php echo esc_html( isset( $_GET['count'] ) ? absint( $_GET['count'] ) : 0 ); ?> regole importate con successo.</strong></p>
+                </div>
+            <?php elseif ( $message === 'imported_zero' ) : ?>
+                <div class="sdi-notice notice-warning">
+                    <p><strong>Nessuna regola importata.</strong> Il file CSV è vuoto o contiene solo intestazioni. Aggiungi almeno una riga di dati.</p>
+                </div>
+            <?php elseif ( $message === 'import_errors' && ! empty( $_GET['errors'] ) ) : ?>
+                <?php
+                $err_json = sanitize_text_field( wp_unslash( $_GET['errors'] ) );
+                $err_list = json_decode( $err_json, true );
+                ?>
+                <div class="sdi-notice error">
+                    <p><strong>Importazione CSV:</strong></p>
+                    <ul>
+                        <?php foreach ( is_array( $err_list ) ? $err_list : [] as $e ) : ?>
+                            <li><?php echo esc_html( $e ); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
                 </div>
             <?php endif; ?>
             
@@ -758,10 +933,10 @@ class Smart_Div_Injector {
                                             } elseif ( ( $rule['match_mode'] === 'single_posts_category' || $rule['match_mode'] === 'category_archive' ) && $rule['category_id'] ) {
                                                 $cat = get_category( $rule['category_id'] );
                                                 echo '<span class="dashicons dashicons-category"></span>';
-                                                echo $cat ? esc_html( $cat->name ) : 'Categoria #' . absint( $rule['category_id'] );
+                                                echo $cat ? esc_html( $cat->name ) : 'Categoria #' . $rule['category_id'];
                                             } elseif ( $rule['match_mode'] === 'page' && $rule['page_id'] ) {
                                                 echo '<span class="dashicons dashicons-admin-page"></span>';
-                                                echo esc_html( get_the_title( $rule['page_id'] ) ) ?: 'Pagina #' . absint( $rule['page_id'] );
+                                                echo get_the_title( $rule['page_id'] ) ?: 'Pagina #' . $rule['page_id'];
                                             } else {
                                                 echo '—';
                                             }
@@ -946,7 +1121,6 @@ class Smart_Div_Injector {
                                     'type'      => 'plain',
                                 ];
                                 echo '<span class="pagination-links">';
-                                // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
                                 echo paginate_links( $pagination_args );
                                 echo '</span>';
                                 ?>
@@ -1016,7 +1190,6 @@ class Smart_Div_Injector {
         })();
         </script>
         <?php
-        // phpcs:enable WordPress.Security.NonceVerification.Recommended
     }
 
     /**
@@ -1220,7 +1393,7 @@ class Smart_Div_Injector {
                             
                             <?php if ( $total_pages > $limit ) : ?>
                                 <div class="sdi-notice warning" style="margin-bottom: 15px;">
-                                    <p><strong>⚠️ Attenzione:</strong> Il tuo sito ha <strong><?php echo number_format( $total_pages ); ?></strong> pagine. Il dropdown mostra solo le prime <strong><?php echo absint( $limit ); ?></strong>.</p>
+                                    <p><strong>⚠️ Attenzione:</strong> Il tuo sito ha <strong><?php echo number_format( $total_pages ); ?></strong> pagine. Il dropdown mostra solo le prime <strong><?php echo $limit; ?></strong>.</p>
                                     <p>Se non trovi la pagina, usa il campo ID manuale qui sotto.</p>
                                 </div>
                             <?php endif; ?>
@@ -1325,10 +1498,10 @@ class Smart_Div_Injector {
                                     $variant_code = $variant['code'] ?? '';
                                     $is_active = ( $index === $active_variant );
                                 ?>
-                                    <div class="sdi-variant-item" data-variant-index="<?php echo absint( $index ); ?>">
+                                    <div class="sdi-variant-item" data-variant-index="<?php echo $index; ?>">
                                         <div class="sdi-variant-header">
                                             <div class="sdi-variant-title">
-                                                <span class="sdi-variant-number">Variante #<?php echo absint( $index + 1 ); ?></span>
+                                                <span class="sdi-variant-number">Variante #<?php echo $index + 1; ?></span>
                                                 <input type="text" 
                                                        name="variant_names[]" 
                                                        value="<?php echo esc_attr( $variant_name ); ?>" 
@@ -1340,10 +1513,10 @@ class Smart_Div_Injector {
                                                 <?php if ( $is_active ) : ?>
                                                     <span class="sdi-active-badge">✓ Attiva</span>
                                                 <?php else : ?>
-                                                    <button type="button" class="button sdi-btn-activate-variant" onclick="sdiActivateVariant(<?php echo absint( $index ); ?>)">Attiva questa</button>
+                                                    <button type="button" class="button sdi-btn-activate-variant" onclick="sdiActivateVariant(<?php echo $index; ?>)">Attiva questa</button>
                                                 <?php endif; ?>
                                                 <?php if ( count( $variants ) > 1 ) : ?>
-                                                    <button type="button" class="button sdi-btn-delete-variant" onclick="sdiRemoveVariant(<?php echo absint( $index ); ?>)" title="Elimina variante">
+                                                    <button type="button" class="button sdi-btn-delete-variant" onclick="sdiRemoveVariant(<?php echo $index; ?>)" title="Elimina variante">
                                                         <span class="dashicons dashicons-trash"></span>
                                                     </button>
                                                 <?php endif; ?>
@@ -1812,16 +1985,9 @@ class Smart_Div_Injector {
                     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && empty( trim( $variant_code ) ) ) {
                         add_action( 'wp_footer', function() use ( $rule_id, $rule ) {
                             $rule_name = esc_html( $rule['name'] ?? 'Senza nome' );
-                            $active_var = absint( $rule['active_variant'] ?? 0 );
+                            $active_var = $rule['active_variant'] ?? 0;
                             $variants_count = count( $rule['variants'] ?? [] );
-                            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Debug comment with sanitized data
-                            echo sprintf(
-                                "<!-- Smart Div Injector DEBUG: Regola '%s' (ID: %s) - Variante attiva #%d/%d ha codice vuoto -->\n",
-                                esc_html( $rule_name ),
-                                esc_html( $rule_id ),
-                                absint( $active_var ),
-                                absint( $variants_count )
-                            );
+                            echo "<!-- Smart Div Injector DEBUG: Regola '{$rule_name}' (ID: {$rule_id}) - Variante attiva #{$active_var}/{$variants_count} ha codice vuoto -->\n";
                         }, 999 );
                     }
                     
@@ -1849,7 +2015,7 @@ class Smart_Div_Injector {
                      * @param array $rule La regola completa
                      * @param string $rule_id ID della regola
                      */
-                    $payload = apply_filters( 'smart_div_injector_injection_payload', $payload, $rule, $rule_id );
+                    $payload = apply_filters( 'sdi_injection_payload', $payload, $rule, $rule_id );
                     
                     // Verifica che il payload sia ancora valido dopo il filtro
                     if ( ! empty( $payload['selector'] ) && ! empty( $payload['code'] ) ) {
@@ -1870,7 +2036,7 @@ class Smart_Div_Injector {
                 ];
             }, $payloads );
             
-            wp_register_script( 'sdi-runtime', false, [], '2.5.2', true );
+            wp_register_script( 'sdi-runtime', false, [], false, true );
             wp_enqueue_script( 'sdi-runtime' );
             
             // Passa i dati codificati
@@ -2035,146 +2201,183 @@ class Smart_Div_Injector {
     private function get_inline_js(): string {
         // I payload vengono passati tramite wp_localize_script come variabile globale sdiPayloads
         // JavaScript inline formattato per leggibilità
-        $js = '(function(){' . "\n";
-        $js .= '  try {' . "\n";
-        $js .= '    var rules = window.sdiPayloads || [];' . "\n";
-        $js .= '    ' . "\n";
-        $js .= '    function ready(fn){ ' . "\n";
-        $js .= '      if(document.readyState !== \'loading\'){ ' . "\n";
-        $js .= '        fn(); ' . "\n";
-        $js .= '      } else { ' . "\n";
-        $js .= '        document.addEventListener(\'DOMContentLoaded\', fn); ' . "\n";
-        $js .= '      } ' . "\n";
-        $js .= '    }' . "\n";
-        $js .= '    ' . "\n";
-        $js .= '    function insert(target, html, where){' . "\n";
-        $js .= '      if(!target) return;' . "\n";
-        $js .= '      var temp = document.createElement(\'div\');' . "\n";
-        $js .= '      temp.innerHTML = html;' . "\n";
-        $js .= '      var elements = Array.from(temp.childNodes);' . "\n";
-        $js .= '      insertSequentially(target, elements, where, 0);' . "\n";
-        $js .= '    }' . "\n";
-        $js .= '    ' . "\n";
-        $js .= '    function insertSequentially(target, elements, where, index) {' . "\n";
-        $js .= '      if (index >= elements.length) return;' . "\n";
-        $js .= '      var el = elements[index];' . "\n";
-        $js .= '      var isExternalScript = el.nodeType === 1 && el.tagName === \'SCRIPT\' && el.hasAttribute(\'src\');' . "\n";
-        $js .= '      var continueNext = function() {' . "\n";
-        $js .= '        insertSequentially(target, elements, where, index + 1);' . "\n";
-        $js .= '      };' . "\n";
-        $js .= '      try {' . "\n";
-        $js .= '        var newElement;' . "\n";
-        $js .= '        if (el.nodeType === 1) {' . "\n";
-        $js .= '          newElement = cloneAndExecute(el);' . "\n";
-        $js .= '        } else {' . "\n";
-        $js .= '          newElement = el.cloneNode(true);' . "\n";
-        $js .= '        }' . "\n";
-        $js .= '        switch(where){' . "\n";
-        $js .= '          case \'prepend\':' . "\n";
-        $js .= '            target.insertBefore(newElement, target.firstChild);' . "\n";
-        $js .= '            break;' . "\n";
-        $js .= '          case \'before\':' . "\n";
-        $js .= '            target.parentNode.insertBefore(newElement, target);' . "\n";
-        $js .= '            break;' . "\n";
-        $js .= '          case \'after\':' . "\n";
-        $js .= '            target.parentNode.insertBefore(newElement, target.nextSibling);' . "\n";
-        $js .= '            break;' . "\n";
-        $js .= '          case \'replace\':' . "\n";
-        $js .= '            if (index === 0) target.innerHTML = \'\';' . "\n";
-        $js .= '            target.appendChild(newElement);' . "\n";
-        $js .= '            break;' . "\n";
-        $js .= '          case \'append\':' . "\n";
-        $js .= '          default:' . "\n";
-        $js .= '            target.appendChild(newElement);' . "\n";
-        $js .= '        }' . "\n";
-        $js .= '        if (isExternalScript) {' . "\n";
-        $js .= '          newElement.onload = continueNext;' . "\n";
-        $js .= '          newElement.onerror = function() {' . "\n";
-        $js .= '            console.warn(\'Smart Div Injector: Errore nel caricamento dello script:\', el.getAttribute(\'src\'));' . "\n";
-        $js .= '            continueNext();' . "\n";
-        $js .= '          };' . "\n";
-        $js .= '        } else {' . "\n";
-        $js .= '          setTimeout(continueNext, 0);' . "\n";
-        $js .= '        }' . "\n";
-        $js .= '      } catch(e) {' . "\n";
-        $js .= '        console.warn(\'Smart Div Injector: Errore nell\\\'inserimento dell\\\'elemento\', e);' . "\n";
-        $js .= '        continueNext();' . "\n";
-        $js .= '      }' . "\n";
-        $js .= '    }' . "\n";
-        $js .= '    ' . "\n";
-        $js .= '    function cloneAndExecute(element) {' . "\n";
-        $js .= '      if (element.nodeType === 1 && element.tagName === \'SCRIPT\') {' . "\n";
-        $js .= '        var script = document.createElement(\'script\');' . "\n";
-        $js .= '        Array.from(element.attributes).forEach(function(attr) {' . "\n";
-        $js .= '          try {' . "\n";
-        $js .= '            var value = element.getAttribute(attr.name);' . "\n";
-        $js .= '            if (value !== null) {' . "\n";
-        $js .= '              script.setAttribute(attr.name, value);' . "\n";
-        $js .= '            }' . "\n";
-        $js .= '          } catch(e) {' . "\n";
-        $js .= '            console.warn(\'Smart Div Injector: Errore nel copiare attributo\', attr.name, e);' . "\n";
-        $js .= '          }' . "\n";
-        $js .= '        });' . "\n";
-        $js .= '        if (element.textContent) {' . "\n";
-        $js .= '          script.textContent = element.textContent;' . "\n";
-        $js .= '        } else if (element.text) {' . "\n";
-        $js .= '          script.text = element.text;' . "\n";
-        $js .= '        }' . "\n";
-        $js .= '        return script;' . "\n";
-        $js .= '      }' . "\n";
-        $js .= '      var clone = element.cloneNode(false);' . "\n";
-        $js .= '      Array.from(element.childNodes).forEach(function(child) {' . "\n";
-        $js .= '        if (child.nodeType === 1 && child.tagName === \'SCRIPT\') {' . "\n";
-        $js .= '          clone.appendChild(cloneAndExecute(child));' . "\n";
-        $js .= '        } else if (child.nodeType === 1) {' . "\n";
-        $js .= '          clone.appendChild(cloneAndExecute(child));' . "\n";
-        $js .= '        } else {' . "\n";
-        $js .= '          clone.appendChild(child.cloneNode(true));' . "\n";
-        $js .= '        }' . "\n";
-        $js .= '      });' . "\n";
-        $js .= '      return clone;' . "\n";
-        $js .= '    }' . "\n";
-        $js .= '    ' . "\n";
-        $js .= '    ready(function(){' . "\n";
-        $js .= '      if (!rules || !Array.isArray(rules)) {' . "\n";
-        $js .= '        console.warn(\'Smart Div Injector: Nessuna regola valida da processare\');' . "\n";
-        $js .= '        return;' . "\n";
-        $js .= '      }' . "\n";
-        $js .= '      rules.forEach(function(rule, index){' . "\n";
-        $js .= '        try {' . "\n";
-        $js .= '          if (!rule || !rule.selector || !rule.code) {' . "\n";
-        $js .= '            console.warn(\'Smart Div Injector: Regola #\' + (index + 1) + \' non valida\');' . "\n";
-        $js .= '            return;' . "\n";
-        $js .= '          }' . "\n";
-        $js .= '          var el = document.querySelector(rule.selector);' . "\n";
-        $js .= '          if(!el){ ' . "\n";
-        $js .= '            console.warn(\'Smart Div Injector: Selettore non trovato:\', rule.selector);' . "\n";
-        $js .= '            return; ' . "\n";
-        $js .= '          }' . "\n";
-        $js .= '          var decodedCode;' . "\n";
-        $js .= '          try {' . "\n";
-        $js .= '            decodedCode = decodeURIComponent(atob(rule.code).split(\'\').map(function(c) {' . "\n";
-        $js .= '              return \'%\' + (\'00\' + c.charCodeAt(0).toString(16)).slice(-2);' . "\n";
-        $js .= '            }).join(\'\'));' . "\n";
-        $js .= '          } catch(decodeError) {' . "\n";
-        $js .= '            console.warn(\'Smart Div Injector: Errore decodifica UTF-8, uso fallback per regola #\' + (index + 1));' . "\n";
-        $js .= '            try {' . "\n";
-        $js .= '              decodedCode = atob(rule.code);' . "\n";
-        $js .= '            } catch(base64Error) {' . "\n";
-        $js .= '              console.error(\'Smart Div Injector: Impossibile decodificare la regola #\' + (index + 1), base64Error);' . "\n";
-        $js .= '              return;' . "\n";
-        $js .= '            }' . "\n";
-        $js .= '          }' . "\n";
-        $js .= '          insert(el, decodedCode, rule.position || \'append\');' . "\n";
-        $js .= '        } catch(e) { ' . "\n";
-        $js .= '          console.warn(\'Smart Div Injector: Errore nell\\\'iniezione della regola #\' + (index + 1), e); ' . "\n";
-        $js .= '        }' . "\n";
-        $js .= '      });' . "\n";
-        $js .= '    });' . "\n";
-        $js .= '  } catch(globalError) {' . "\n";
-        $js .= '    console.error(\'Smart Div Injector: Errore critico:\', globalError);' . "\n";
-        $js .= '  }' . "\n";
-        $js .= '})();';
+        $js = <<<'JS'
+(function(){
+  try {
+    // I dati sono passati da wp_localize_script nella variabile globale sdiPayloads
+    var rules = window.sdiPayloads || [];
+    
+    function ready(fn){ 
+      if(document.readyState !== 'loading'){ 
+        fn(); 
+      } else { 
+        document.addEventListener('DOMContentLoaded', fn); 
+      } 
+    }
+    
+    function insert(target, html, where){
+      if(!target) return;
+      
+      // Crea un contenitore temporaneo
+      var temp = document.createElement('div');
+      temp.innerHTML = html;
+      
+      // Estrae tutti gli elementi (non solo gli script)
+      var elements = Array.from(temp.childNodes);
+      
+      // Inserisci gli elementi in modo sequenziale, aspettando gli script esterni
+      insertSequentially(target, elements, where, 0);
+    }
+    
+    function insertSequentially(target, elements, where, index) {
+      if (index >= elements.length) return; // Fine della sequenza
+      
+      var el = elements[index];
+      var isExternalScript = el.nodeType === 1 && el.tagName === 'SCRIPT' && el.hasAttribute('src');
+      
+      // Funzione per continuare con il prossimo elemento
+      var continueNext = function() {
+        insertSequentially(target, elements, where, index + 1);
+      };
+      
+      try {
+        var newElement;
+        
+        if (el.nodeType === 1) {
+          newElement = cloneAndExecute(el);
+        } else {
+          newElement = el.cloneNode(true);
+        }
+        
+        // Inserisci l'elemento nella posizione corretta
+        switch(where){
+          case 'prepend':
+            target.insertBefore(newElement, target.firstChild);
+            break;
+          case 'before':
+            target.parentNode.insertBefore(newElement, target);
+                break;
+          case 'after':
+            target.parentNode.insertBefore(newElement, target.nextSibling);
+                break;
+          case 'replace':
+            if (index === 0) target.innerHTML = '';
+            target.appendChild(newElement);
+                break;
+          case 'append':
+          default:
+            target.appendChild(newElement);
+        }
+        
+        // Se è uno script esterno, aspetta che sia caricato
+        if (isExternalScript) {
+          newElement.onload = continueNext;
+          newElement.onerror = function() {
+            console.warn('Smart Div Injector: Errore nel caricamento dello script:', el.getAttribute('src'));
+            continueNext();
+          };
+        } else {
+          // Altrimenti continua subito (ma usa setTimeout per evitare problemi di stack)
+          setTimeout(continueNext, 0);
+        }
+      } catch(e) {
+        console.warn('Smart Div Injector: Errore nell\'inserimento dell\'elemento', e);
+        continueNext();
+      }
+    }
+    
+    function cloneAndExecute(element) {
+      // Se è uno script, crea una copia eseguibile
+      if (element.nodeType === 1 && element.tagName === 'SCRIPT') {
+        var script = document.createElement('script');
+        
+        // Copia tutti gli attributi in modo sicuro
+        Array.from(element.attributes).forEach(function(attr) {
+          try {
+            // Usa getAttribute per ottenere il valore non processato
+            var value = element.getAttribute(attr.name);
+            if (value !== null) {
+              script.setAttribute(attr.name, value);
+            }
+          } catch(e) {
+            console.warn('Smart Div Injector: Errore nel copiare attributo', attr.name, e);
+          }
+        });
+        
+        // Copia il contenuto dello script
+        if (element.textContent) {
+          script.textContent = element.textContent;
+        } else if (element.text) {
+          script.text = element.text;
+        }
+        
+        return script;
+      }
+      
+      // Per altri elementi, clona e processa ricorsivamente gli script al loro interno
+      var clone = element.cloneNode(false);
+      
+      Array.from(element.childNodes).forEach(function(child) {
+        if (child.nodeType === 1 && child.tagName === 'SCRIPT') {
+          clone.appendChild(cloneAndExecute(child));
+        } else if (child.nodeType === 1) {
+          clone.appendChild(cloneAndExecute(child));
+        } else {
+          clone.appendChild(child.cloneNode(true));
+        }
+      });
+      
+      return clone;
+    }
+    
+    ready(function(){
+      if (!rules || !Array.isArray(rules)) {
+        console.warn('Smart Div Injector: Nessuna regola valida da processare');
+        return;
+      }
+      
+      // Processa ogni regola
+      rules.forEach(function(rule, index){
+        try {
+          if (!rule || !rule.selector || !rule.code) {
+            console.warn('Smart Div Injector: Regola #' + (index + 1) + ' non valida');
+            return;
+        }
+
+          var el = document.querySelector(rule.selector);
+          if(!el){ 
+            console.warn('Smart Div Injector: Selettore non trovato:', rule.selector);
+            return; 
+          }
+          
+          // Decodifica il codice da base64 con gestione UTF-8
+          var decodedCode;
+          try {
+            decodedCode = decodeURIComponent(atob(rule.code).split('').map(function(c) {
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+          } catch(decodeError) {
+            // Fallback: decodifica base64 semplice se UTF-8 fallisce
+            console.warn('Smart Div Injector: Errore decodifica UTF-8, uso fallback per regola #' + (index + 1));
+            try {
+              decodedCode = atob(rule.code);
+            } catch(base64Error) {
+              console.error('Smart Div Injector: Impossibile decodificare la regola #' + (index + 1), base64Error);
+              return;
+            }
+          }
+          
+          insert(el, decodedCode, rule.position || 'append');
+        } catch(e) { 
+          console.warn('Smart Div Injector: Errore nell\'iniezione della regola #' + (index + 1), e); 
+        }
+      });
+    });
+  } catch(globalError) {
+    console.error('Smart Div Injector: Errore critico:', globalError);
+  }
+})();
+JS;
         
         return $js;
     }
