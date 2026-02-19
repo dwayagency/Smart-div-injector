@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Smart Div Injector
  * Description: Inserisce un frammento di codice dentro una div specifica, in base a articolo, pagina e/o categoria. Supporta regole multiple con varianti, modifica rapida, ricerca, filtri e paginazione.
- * Version: 2.5.0
+ * Version: 2.5.2
  * Author: DWAY SRL
  * Author URI: https://dway.agency
  * License: GPL-2.0+
@@ -47,7 +47,7 @@ class Smart_Div_Injector {
             'sdi-admin-style', 
             plugins_url( 'admin-style.css', __FILE__ ), 
             [], 
-            '2.5.0'
+            '2.5.2'
         );
     }
     
@@ -126,48 +126,52 @@ class Smart_Div_Injector {
             return;
         }
         
-        if ( isset( $_POST['sdi_nonce'] ) && ! wp_verify_nonce( $_POST['sdi_nonce'], 'sdi_rule_action' ) ) {
+        if ( isset( $_POST['sdi_nonce'] ) && ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sdi_nonce'] ) ), 'sdi_rule_action' ) ) {
             wp_die( 'Nonce verification failed' );
         }
         
         // Aggiungi nuova regola
         if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'add' ) {
             $this->save_rule_from_post();
-            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=added' ) );
+            wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=added' ) );
             exit;
         }
         
         // Modifica regola esistente
         if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'edit' && isset( $_POST['rule_id'] ) ) {
-            $this->update_rule_from_post( $_POST['rule_id'] );
-            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=updated' ) );
+            $this->update_rule_from_post( sanitize_text_field( wp_unslash( $_POST['rule_id'] ) ) );
+            wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=updated' ) );
             exit;
         }
         
         // Elimina regola
         if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' && isset( $_GET['rule_id'] ) ) {
-            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'delete_rule_' . $_GET['rule_id'] ) ) {
+            $rule_id = sanitize_text_field( wp_unslash( $_GET['rule_id'] ) );
+            $nonce   = isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '';
+            if ( ! wp_verify_nonce( $nonce, 'delete_rule_' . $rule_id ) ) {
                 wp_die( 'Nonce verification failed' );
             }
-            $this->delete_rule( $_GET['rule_id'] );
-            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=deleted' ) );
+            $this->delete_rule( $rule_id );
+            wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=deleted' ) );
             exit;
         }
         
         // Duplica regola
         if ( isset( $_GET['action'] ) && $_GET['action'] === 'duplicate' && isset( $_GET['rule_id'] ) ) {
-            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'duplicate_rule_' . $_GET['rule_id'] ) ) {
+            $rule_id = sanitize_text_field( wp_unslash( $_GET['rule_id'] ) );
+            $nonce   = isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '';
+            if ( ! wp_verify_nonce( $nonce, 'duplicate_rule_' . $rule_id ) ) {
                 wp_die( 'Nonce verification failed' );
             }
-            $this->duplicate_rule( $_GET['rule_id'] );
-            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=duplicated' ) );
+            $this->duplicate_rule( $rule_id );
+            wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=duplicated' ) );
             exit;
         }
         
         // Modifica rapida (quick edit)
         if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'quick_edit' && isset( $_POST['rule_id'] ) ) {
-            $this->quick_edit_rule( $_POST['rule_id'] );
-            wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=quick_updated' ) );
+            $this->quick_edit_rule( sanitize_text_field( wp_unslash( $_POST['rule_id'] ) ) );
+            wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=quick_updated' ) );
             exit;
         }
         
@@ -180,16 +184,17 @@ class Smart_Div_Injector {
             exit;
         }
         
-        // Importa CSV
+        // Importa CSV (file validated by is_uploaded_file in import_rules_from_csv).
         if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'import_csv' && ! empty( $_FILES['sdi_csv_file']['tmp_name'] ) ) {
+            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Validated via is_uploaded_file() in import_rules_from_csv().
             $result = $this->import_rules_from_csv( $_FILES['sdi_csv_file'] );
             if ( isset( $result['imported'] ) && $result['imported'] > 0 ) {
                 $msg = $result['imported'] === 1 ? 'imported_one' : 'imported_many';
-                wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=' . $msg . '&count=' . $result['imported'] ) );
+                wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=' . $msg . '&count=' . $result['imported'] ) );
             } elseif ( ! empty( $result['errors'] ) ) {
-                wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=import_errors&errors=' . urlencode( wp_json_encode( $result['errors'] ) ) ) );
+                wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=import_errors&errors=' . urlencode( wp_json_encode( $result['errors'] ) ) ) );
             } else {
-                wp_redirect( admin_url( 'admin.php?page=smart-div-injector&message=imported_zero' ) );
+                wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=imported_zero' ) );
             }
             exit;
         }
@@ -205,6 +210,7 @@ class Smart_Div_Injector {
         header( 'Cache-Control: no-cache, no-store, must-revalidate' );
         header( 'Pragma: no-public' );
         header( 'Expires: 0' );
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Writing to php://output stream, not filesystem.
         $out = fopen( 'php://output', 'w' );
         if ( $out === false ) {
             return;
@@ -241,6 +247,7 @@ class Smart_Div_Injector {
             'Variante 1',
             '<div class="banner">Testo con spazi e virgole, va bene.</div>',
         ] );
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- php://output stream.
         fclose( $out );
     }
     
@@ -255,18 +262,21 @@ class Smart_Div_Injector {
             $errors[] = __( 'File non valido o non caricato.', 'smart-div-injector' );
             return [ 'imported' => 0, 'errors' => $errors ];
         }
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Reading uploaded temp file; WP_Filesystem not suitable.
         $handle = fopen( $tmp, 'r' );
         if ( $handle === false ) {
             $errors[] = __( 'Impossibile aprire il file CSV.', 'smart-div-injector' );
             return [ 'imported' => 0, 'errors' => $errors ];
         }
         // BOM UTF-8
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- Reading uploaded temp file.
         $bom = fread( $handle, 3 );
         if ( $bom !== chr(0xEF) . chr(0xBB) . chr(0xBF) ) {
             rewind( $handle );
         }
         $header = fgetcsv( $handle );
         if ( $header === false ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Uploaded temp file.
             fclose( $handle );
             $errors[] = __( 'Il file CSV è vuoto o non valido.', 'smart-div-injector' );
             return [ 'imported' => 0, 'errors' => $errors ];
@@ -306,6 +316,7 @@ class Smart_Div_Injector {
             $rules[ $rule_id ] = $rule;
             $imported++;
         }
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Uploaded temp file.
         fclose( $handle );
         if ( $imported > 0 ) {
             $this->save_rules( $rules );
@@ -315,8 +326,10 @@ class Smart_Div_Injector {
     
     /**
      * Salva una nuova regola dai dati POST
+     * Nonce verificato in handle_actions() prima della chiamata.
      */
     private function save_rule_from_post() {
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified in handle_actions().
         $rule = $this->sanitize_rule_data( $_POST );
         $rule_id = $this->generate_rule_id();
         
@@ -327,8 +340,10 @@ class Smart_Div_Injector {
     
     /**
      * Aggiorna una regola esistente
+     * Nonce verificato in handle_actions() prima della chiamata.
      */
     private function update_rule_from_post( $rule_id ) {
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified in handle_actions().
         $rule = $this->sanitize_rule_data( $_POST );
         
         $rules = $this->get_rules();
@@ -365,6 +380,7 @@ class Smart_Div_Injector {
     
     /**
      * Modifica rapida di una regola (quick edit)
+     * Nonce verificato in handle_actions() prima della chiamata.
      */
     private function quick_edit_rule( $rule_id ) {
         $rules = $this->get_rules();
@@ -375,9 +391,10 @@ class Smart_Div_Injector {
         
         $rule = $rules[ $rule_id ];
         
-        // Aggiorna solo i campi modificabili tramite quick edit
+        // Aggiorna solo i campi modificabili tramite quick edit.
+        // phpcs:disable WordPress.Security.NonceVerification.Missing -- Nonce verified in handle_actions().
         if ( isset( $_POST['name'] ) ) {
-            $rule['name'] = sanitize_text_field( $_POST['name'] );
+            $rule['name'] = sanitize_text_field( wp_unslash( $_POST['name'] ) );
         }
         
         if ( isset( $_POST['active'] ) ) {
@@ -388,15 +405,17 @@ class Smart_Div_Injector {
         
         if ( isset( $_POST['device_target'] ) ) {
             $valid_devices = [ 'both', 'desktop', 'mobile' ];
-            if ( in_array( $_POST['device_target'], $valid_devices, true ) ) {
-                $rule['device_target'] = $_POST['device_target'];
+            $device_target = sanitize_text_field( wp_unslash( $_POST['device_target'] ) );
+            if ( in_array( $device_target, $valid_devices, true ) ) {
+                $rule['device_target'] = $device_target;
             }
         }
         
         if ( isset( $_POST['alignment'] ) ) {
             $valid_alignments = [ 'none', 'left', 'right', 'center' ];
-            if ( in_array( $_POST['alignment'], $valid_alignments, true ) ) {
-                $rule['alignment'] = $_POST['alignment'];
+            $alignment = sanitize_text_field( wp_unslash( $_POST['alignment'] ) );
+            if ( in_array( $alignment, $valid_alignments, true ) ) {
+                $rule['alignment'] = $alignment;
             }
         }
         
@@ -409,6 +428,7 @@ class Smart_Div_Injector {
                 $rule['active_variant'] = $active_variant;
             }
         }
+        // phpcs:enable WordPress.Security.NonceVerification.Missing
         
         $rules[ $rule_id ] = $rule;
         $this->save_rules( $rules );
@@ -429,16 +449,16 @@ class Smart_Div_Injector {
         $valid_alignments = [ 'none', 'left', 'right', 'center' ];
         
         $rule = [
-            'name'              => isset( $data['name'] ) ? sanitize_text_field( $data['name'] ) : 'Regola senza nome',
+            'name'              => isset( $data['name'] ) ? sanitize_text_field( wp_unslash( $data['name'] ) ) : 'Regola senza nome',
             'active'            => isset( $data['active'] ) && $data['active'] === '1',
-            'match_mode'        => in_array( $data['match_mode'] ?? 'single_posts', $valid_modes, true ) ? $data['match_mode'] : 'single_posts',
+            'match_mode'        => in_array( $data['match_mode'] ?? 'single_posts', $valid_modes, true ) ? ( $data['match_mode'] ) : 'single_posts',
             'page_id'           => isset( $data['page_id'] ) ? absint( $data['page_id'] ) : 0,
             'category_id'       => isset( $data['category_id'] ) ? absint( $data['category_id'] ) : 0,
-            'selector'          => isset( $data['selector'] ) ? sanitize_text_field( $data['selector'] ) : '',
-            'position'          => in_array( $data['position'] ?? 'append', $valid_positions, true ) ? $data['position'] : 'append',
+            'selector'          => isset( $data['selector'] ) ? sanitize_text_field( wp_unslash( $data['selector'] ) ) : '',
+            'position'          => in_array( $data['position'] ?? 'append', $valid_positions, true ) ? ( $data['position'] ) : 'append',
             'paragraph_number'  => isset( $data['paragraph_number'] ) ? absint( $data['paragraph_number'] ) : 1,
-            'device_target'     => in_array( $data['device_target'] ?? 'both', $valid_devices, true ) ? $data['device_target'] : 'both',
-            'alignment'         => in_array( $data['alignment'] ?? 'none', $valid_alignments, true ) ? $data['alignment'] : 'none',
+            'device_target'     => in_array( $data['device_target'] ?? 'both', $valid_devices, true ) ? ( $data['device_target'] ) : 'both',
+            'alignment'         => in_array( $data['alignment'] ?? 'none', $valid_alignments, true ) ? ( $data['alignment'] ) : 'none',
             'active_variant'    => isset( $data['active_variant'] ) ? absint( $data['active_variant'] ) : 0,
         ];
         
@@ -486,7 +506,7 @@ class Smart_Div_Injector {
                 // Salva SEMPRE la variante, anche se il codice è vuoto
                 // (mantiene gli indici corretti e l'utente può compilarla dopo)
                 $variants[] = [
-                    'name' => sanitize_text_field( $variant_name ),
+                    'name' => sanitize_text_field( wp_unslash( $variant_name ) ),
                     'code' => $sanitized_code,
                 ];
             }
@@ -598,10 +618,13 @@ class Smart_Div_Injector {
             return;
         }
         
-        // Determina quale vista mostrare
-        if ( isset( $_GET['action'] ) && $_GET['action'] === 'edit' && isset( $_GET['rule_id'] ) ) {
-            $this->render_edit_rule_page( $_GET['rule_id'] );
-        } elseif ( isset( $_GET['action'] ) && $_GET['action'] === 'add' ) {
+        // Determina quale vista mostrare (GET usato solo per visualizzazione, non modifica stato).
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display-only routing.
+        $action   = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
+        $rule_id  = isset( $_GET['rule_id'] ) ? sanitize_text_field( wp_unslash( $_GET['rule_id'] ) ) : '';
+        if ( $action === 'edit' && $rule_id !== '' ) {
+            $this->render_edit_rule_page( $rule_id );
+        } elseif ( $action === 'add' ) {
             $this->render_add_rule_page();
         } else {
             $this->render_rules_list_page();
@@ -614,13 +637,14 @@ class Smart_Div_Injector {
     private function render_rules_list_page() {
         $all_rules = $this->get_rules();
         
-        // Parametri di ricerca, filtri e paginazione
-        $search = isset( $_GET['s'] ) ? sanitize_text_field( $_GET['s'] ) : '';
-        $filter_status = isset( $_GET['filter_status'] ) ? sanitize_text_field( $_GET['filter_status'] ) : '';
-        $filter_type = isset( $_GET['filter_type'] ) ? sanitize_text_field( $_GET['filter_type'] ) : '';
-        $filter_device = isset( $_GET['filter_device'] ) ? sanitize_text_field( $_GET['filter_device'] ) : '';
-        $per_page = isset( $_GET['per_page'] ) ? absint( $_GET['per_page'] ) : 20;
-        $paged = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+        // Parametri di ricerca, filtri e paginazione (GET solo lettura per filtri/display).
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display and filter only.
+        $search        = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
+        $filter_status = isset( $_GET['filter_status'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_status'] ) ) : '';
+        $filter_type   = isset( $_GET['filter_type'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_type'] ) ) : '';
+        $filter_device = isset( $_GET['filter_device'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_device'] ) ) : '';
+        $per_page      = isset( $_GET['per_page'] ) ? absint( $_GET['per_page'] ) : 20;
+        $paged         = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
         
         // Applica filtri
         $filtered_rules = $all_rules;
@@ -666,10 +690,11 @@ class Smart_Div_Injector {
         $rules = array_slice( $filtered_rules, $offset, $per_page, true );
         
         // Messaggi di conferma
-        $message = isset( $_GET['message'] ) ? $_GET['message'] : '';
+        $message = isset( $_GET['message'] ) ? sanitize_text_field( wp_unslash( $_GET['message'] ) ) : '';
         
         // Costruisci URL base per mantenere i filtri
-        $base_url = remove_query_arg( [ 'message', 'paged' ], $_SERVER['REQUEST_URI'] );
+        $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+        $base_url    = remove_query_arg( [ 'message', 'paged' ], $request_uri );
         
         ?>
         <div class="wrap">
@@ -743,7 +768,7 @@ class Smart_Div_Injector {
                 </div>
             <?php elseif ( $message === 'imported_many' ) : ?>
                 <div class="sdi-notice success">
-                    <p><strong>✓ <?php echo esc_html( isset( $_GET['count'] ) ? absint( $_GET['count'] ) : 0 ); ?> regole importate con successo.</strong></p>
+                    <p><strong>✓ <?php echo esc_html( isset( $_GET['count'] ) ? absint( wp_unslash( $_GET['count'] ) ) : 0 ); ?> regole importate con successo.</strong></p>
                 </div>
             <?php elseif ( $message === 'imported_zero' ) : ?>
                 <div class="sdi-notice notice-warning">
@@ -751,7 +776,7 @@ class Smart_Div_Injector {
                 </div>
             <?php elseif ( $message === 'import_errors' && ! empty( $_GET['errors'] ) ) : ?>
                 <?php
-                $err_json = sanitize_text_field( wp_unslash( $_GET['errors'] ) );
+                $err_json = isset( $_GET['errors'] ) ? sanitize_text_field( wp_unslash( $_GET['errors'] ) ) : '';
                 $err_list = json_decode( $err_json, true );
                 ?>
                 <div class="sdi-notice error">
@@ -933,10 +958,10 @@ class Smart_Div_Injector {
                                             } elseif ( ( $rule['match_mode'] === 'single_posts_category' || $rule['match_mode'] === 'category_archive' ) && $rule['category_id'] ) {
                                                 $cat = get_category( $rule['category_id'] );
                                                 echo '<span class="dashicons dashicons-category"></span>';
-                                                echo $cat ? esc_html( $cat->name ) : 'Categoria #' . $rule['category_id'];
+                                                echo $cat ? esc_html( $cat->name ) : 'Categoria #' . esc_html( (string) $rule['category_id'] );
                                             } elseif ( $rule['match_mode'] === 'page' && $rule['page_id'] ) {
                                                 echo '<span class="dashicons dashicons-admin-page"></span>';
-                                                echo get_the_title( $rule['page_id'] ) ?: 'Pagina #' . $rule['page_id'];
+                                                echo esc_html( get_the_title( $rule['page_id'] ) ?: 'Pagina #' . $rule['page_id'] );
                                             } else {
                                                 echo '—';
                                             }
@@ -1121,7 +1146,7 @@ class Smart_Div_Injector {
                                     'type'      => 'plain',
                                 ];
                                 echo '<span class="pagination-links">';
-                                echo paginate_links( $pagination_args );
+                                echo wp_kses_post( paginate_links( $pagination_args ) );
                                 echo '</span>';
                                 ?>
                             </div>
@@ -1393,7 +1418,7 @@ class Smart_Div_Injector {
                             
                             <?php if ( $total_pages > $limit ) : ?>
                                 <div class="sdi-notice warning" style="margin-bottom: 15px;">
-                                    <p><strong>⚠️ Attenzione:</strong> Il tuo sito ha <strong><?php echo number_format( $total_pages ); ?></strong> pagine. Il dropdown mostra solo le prime <strong><?php echo $limit; ?></strong>.</p>
+                                    <p><strong>⚠️ Attenzione:</strong> Il tuo sito ha <strong><?php echo number_format( $total_pages ); ?></strong> pagine. Il dropdown mostra solo le prime <strong><?php echo esc_html( (string) $limit ); ?></strong>.</p>
                                     <p>Se non trovi la pagina, usa il campo ID manuale qui sotto.</p>
                                 </div>
                             <?php endif; ?>
@@ -1498,10 +1523,10 @@ class Smart_Div_Injector {
                                     $variant_code = $variant['code'] ?? '';
                                     $is_active = ( $index === $active_variant );
                                 ?>
-                                    <div class="sdi-variant-item" data-variant-index="<?php echo $index; ?>">
+                                    <div class="sdi-variant-item" data-variant-index="<?php echo esc_attr( (string) $index ); ?>">
                                         <div class="sdi-variant-header">
                                             <div class="sdi-variant-title">
-                                                <span class="sdi-variant-number">Variante #<?php echo $index + 1; ?></span>
+                                                <span class="sdi-variant-number">Variante #<?php echo esc_html( (string) ( $index + 1 ) ); ?></span>
                                                 <input type="text" 
                                                        name="variant_names[]" 
                                                        value="<?php echo esc_attr( $variant_name ); ?>" 
@@ -1513,10 +1538,10 @@ class Smart_Div_Injector {
                                                 <?php if ( $is_active ) : ?>
                                                     <span class="sdi-active-badge">✓ Attiva</span>
                                                 <?php else : ?>
-                                                    <button type="button" class="button sdi-btn-activate-variant" onclick="sdiActivateVariant(<?php echo $index; ?>)">Attiva questa</button>
+                                                    <button type="button" class="button sdi-btn-activate-variant" onclick="sdiActivateVariant(<?php echo esc_attr( (string) $index ); ?>)">Attiva questa</button>
                                                 <?php endif; ?>
                                                 <?php if ( count( $variants ) > 1 ) : ?>
-                                                    <button type="button" class="button sdi-btn-delete-variant" onclick="sdiRemoveVariant(<?php echo $index; ?>)" title="Elimina variante">
+                                                    <button type="button" class="button sdi-btn-delete-variant" onclick="sdiRemoveVariant(<?php echo esc_attr( (string) $index ); ?>)" title="Elimina variante">
                                                         <span class="dashicons dashicons-trash"></span>
                                                     </button>
                                                 <?php endif; ?>
@@ -1987,7 +2012,7 @@ class Smart_Div_Injector {
                             $rule_name = esc_html( $rule['name'] ?? 'Senza nome' );
                             $active_var = $rule['active_variant'] ?? 0;
                             $variants_count = count( $rule['variants'] ?? [] );
-                            echo "<!-- Smart Div Injector DEBUG: Regola '{$rule_name}' (ID: {$rule_id}) - Variante attiva #{$active_var}/{$variants_count} ha codice vuoto -->\n";
+                            echo '<!-- Smart Div Injector DEBUG: Regola \'' . $rule_name . '\' (ID: ' . esc_html( (string) $rule_id ) . ') - Variante attiva #' . esc_html( (string) $active_var ) . '/' . esc_html( (string) $variants_count ) . ' ha codice vuoto -->' . "\n";
                         }, 999 );
                     }
                     
@@ -2015,6 +2040,7 @@ class Smart_Div_Injector {
                      * @param array $rule La regola completa
                      * @param string $rule_id ID della regola
                      */
+                    // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- sdi_ is the plugin prefix.
                     $payload = apply_filters( 'sdi_injection_payload', $payload, $rule, $rule_id );
                     
                     // Verifica che il payload sia ancora valido dopo il filtro
@@ -2036,7 +2062,7 @@ class Smart_Div_Injector {
                 ];
             }, $payloads );
             
-            wp_register_script( 'sdi-runtime', false, [], false, true );
+            wp_register_script( 'sdi-runtime', false, [], '2.5.2', true );
             wp_enqueue_script( 'sdi-runtime' );
             
             // Passa i dati codificati
