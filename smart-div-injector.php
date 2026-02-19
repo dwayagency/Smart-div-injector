@@ -619,9 +619,10 @@ class Smart_Div_Injector {
         }
         
         // Determina quale vista mostrare (GET usato solo per visualizzazione, non modifica stato).
-        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display-only routing.
+        // phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET used for display-only routing.
         $action   = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
         $rule_id  = isset( $_GET['rule_id'] ) ? sanitize_text_field( wp_unslash( $_GET['rule_id'] ) ) : '';
+        // phpcs:enable WordPress.Security.NonceVerification.Recommended
         if ( $action === 'edit' && $rule_id !== '' ) {
             $this->render_edit_rule_page( $rule_id );
         } elseif ( $action === 'add' ) {
@@ -638,13 +639,14 @@ class Smart_Div_Injector {
         $all_rules = $this->get_rules();
         
         // Parametri di ricerca, filtri e paginazione (GET solo lettura per filtri/display).
-        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display and filter only.
+        // phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET used for display and filter only.
         $search        = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
         $filter_status = isset( $_GET['filter_status'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_status'] ) ) : '';
         $filter_type   = isset( $_GET['filter_type'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_type'] ) ) : '';
         $filter_device = isset( $_GET['filter_device'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_device'] ) ) : '';
         $per_page      = isset( $_GET['per_page'] ) ? absint( $_GET['per_page'] ) : 20;
         $paged         = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+        // phpcs:enable WordPress.Security.NonceVerification.Recommended
         
         // Applica filtri
         $filtered_rules = $all_rules;
@@ -690,6 +692,7 @@ class Smart_Div_Injector {
         $rules = array_slice( $filtered_rules, $offset, $per_page, true );
         
         // Messaggi di conferma
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- GET used for display message only.
         $message = isset( $_GET['message'] ) ? sanitize_text_field( wp_unslash( $_GET['message'] ) ) : '';
         
         // Costruisci URL base per mantenere i filtri
@@ -768,16 +771,19 @@ class Smart_Div_Injector {
                 </div>
             <?php elseif ( $message === 'imported_many' ) : ?>
                 <div class="sdi-notice success">
-                    <p><strong>✓ <?php echo esc_html( isset( $_GET['count'] ) ? absint( wp_unslash( $_GET['count'] ) ) : 0 ); ?> regole importate con successo.</strong></p>
+                    <p><strong>✓ <?php echo esc_html( isset( $_GET['count'] ) ? absint( wp_unslash( $_GET['count'] ) ) : 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display only. ?> regole importate con successo.</strong></p>
                 </div>
             <?php elseif ( $message === 'imported_zero' ) : ?>
                 <div class="sdi-notice notice-warning">
                     <p><strong>Nessuna regola importata.</strong> Il file CSV è vuoto o contiene solo intestazioni. Aggiungi almeno una riga di dati.</p>
                 </div>
-            <?php elseif ( $message === 'import_errors' && ! empty( $_GET['errors'] ) ) : ?>
+            <?php
+            // phpcs:disable WordPress.Security.NonceVerification.Recommended -- GET used for display only.
+            elseif ( $message === 'import_errors' && ! empty( $_GET['errors'] ) ) : ?>
                 <?php
                 $err_json = isset( $_GET['errors'] ) ? sanitize_text_field( wp_unslash( $_GET['errors'] ) ) : '';
                 $err_list = json_decode( $err_json, true );
+                // phpcs:enable WordPress.Security.NonceVerification.Recommended
                 ?>
                 <div class="sdi-notice error">
                     <p><strong>Importazione CSV:</strong></p>
@@ -2009,10 +2015,9 @@ class Smart_Div_Injector {
                     // Debug: Aggiungi un commento HTML se WP_DEBUG è attivo e il codice è vuoto
                     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && empty( trim( $variant_code ) ) ) {
                         add_action( 'wp_footer', function() use ( $rule_id, $rule ) {
-                            $rule_name = esc_html( $rule['name'] ?? 'Senza nome' );
-                            $active_var = $rule['active_variant'] ?? 0;
+                            $active_var     = $rule['active_variant'] ?? 0;
                             $variants_count = count( $rule['variants'] ?? [] );
-                            echo '<!-- Smart Div Injector DEBUG: Regola \'' . $rule_name . '\' (ID: ' . esc_html( (string) $rule_id ) . ') - Variante attiva #' . esc_html( (string) $active_var ) . '/' . esc_html( (string) $variants_count ) . ' ha codice vuoto -->' . "\n";
+                            echo '<!-- Smart Div Injector DEBUG: Regola \'' . esc_html( $rule['name'] ?? 'Senza nome' ) . '\' (ID: ' . esc_html( (string) $rule_id ) . ') - Variante attiva #' . esc_html( (string) $active_var ) . '/' . esc_html( (string) $variants_count ) . ' ha codice vuoto -->' . "\n";
                         }, 999 );
                     }
                     
