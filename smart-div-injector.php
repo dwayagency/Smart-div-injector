@@ -281,7 +281,9 @@ class Smart_Div_Injector {
             'active',
             'match_mode',
             'page_id',
+            'page_title',
             'category_id',
+            'category_name',
             'selector',
             'position',
             'paragraph_number',
@@ -293,17 +295,45 @@ class Smart_Div_Injector {
         fputcsv( $out, $headers );
         $rules = $this->get_rules();
         foreach ( $rules as $rule_id => $rule ) {
-            $variants = $rule['variants'] ?? [];
-            $active_index = isset( $rule['active_variant'] ) ? (int) $rule['active_variant'] : 0;
-            $variant = isset( $variants[ $active_index ] ) ? $variants[ $active_index ] : ( isset( $variants[0] ) ? $variants[0] : [ 'name' => 'Variante 1', 'code' => '' ] );
-            $variant_name = $variant['name'] ?? 'Variante 1';
-            $variant_code = $variant['code'] ?? '';
+            // Codice e nome variante: stessa logica di get_active_variant_code (incluso supporto legacy rule['code'])
+            $variant_name = 'Variante 1';
+            $variant_code = '';
+            if ( isset( $rule['code'] ) && ! isset( $rule['variants'] ) ) {
+                $variant_code = $rule['code'];
+            } else {
+                $variants   = $rule['variants'] ?? [];
+                $active_idx = isset( $rule['active_variant'] ) ? (int) $rule['active_variant'] : 0;
+                if ( ! empty( $variants ) && isset( $variants[ $active_idx ] ) ) {
+                    $variant_name = $variants[ $active_idx ]['name'] ?? 'Variante 1';
+                    $variant_code = $variants[ $active_idx ]['code'] ?? '';
+                } elseif ( ! empty( $variants ) && isset( $variants[0] ) ) {
+                    $variant_name = $variants[0]['name'] ?? 'Variante 1';
+                    $variant_code = $variants[0]['code'] ?? '';
+                }
+            }
+            // Contesto effettivo: titolo pagina e nome categoria (per lettura immediata)
+            $page_id     = isset( $rule['page_id'] ) ? (int) $rule['page_id'] : 0;
+            $category_id = isset( $rule['category_id'] ) ? (int) $rule['category_id'] : 0;
+            $page_title  = '';
+            $category_name = '';
+            if ( $page_id > 0 && ( $rule['match_mode'] ?? '' ) === 'page' ) {
+                $page_title = get_the_title( $page_id );
+                if ( $page_title === '' ) {
+                    $page_title = '(ID: ' . $page_id . ')';
+                }
+            }
+            if ( $category_id > 0 && in_array( $rule['match_mode'] ?? '', [ 'category_archive', 'single_posts_category' ], true ) ) {
+                $cat = get_category( $category_id );
+                $category_name = $cat && ! is_wp_error( $cat ) ? $cat->name : '(ID: ' . $category_id . ')';
+            }
             fputcsv( $out, [
                 $rule['name'] ?? '',
                 ! empty( $rule['active'] ) ? '1' : '0',
                 $rule['match_mode'] ?? 'single_posts',
-                isset( $rule['page_id'] ) ? (int) $rule['page_id'] : 0,
-                isset( $rule['category_id'] ) ? (int) $rule['category_id'] : 0,
+                $page_id,
+                $page_title,
+                $category_id,
+                $category_name,
                 $rule['selector'] ?? '',
                 $rule['position'] ?? 'append',
                 isset( $rule['paragraph_number'] ) ? (int) $rule['paragraph_number'] : 1,
