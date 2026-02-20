@@ -184,6 +184,15 @@ class Smart_Div_Injector {
             exit;
         }
         
+        // Esporta CSV (tutte le regole)
+        if ( isset( $_GET['action'] ) && $_GET['action'] === 'export_csv' ) {
+            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'sdi_export_csv' ) ) {
+                wp_die( 'Nonce verification failed' );
+            }
+            $this->export_rules_to_csv();
+            exit;
+        }
+        
         // Importa CSV (file validated by is_uploaded_file in import_rules_from_csv).
         if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'import_csv' && ! empty( $_FILES['sdi_csv_file']['tmp_name'] ) ) {
             // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Validated via is_uploaded_file() in import_rules_from_csv().
@@ -247,6 +256,63 @@ class Smart_Div_Injector {
             'Variante 1',
             '<div class="banner">Testo con spazi e virgole, va bene.</div>',
         ] );
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- php://output stream.
+        fclose( $out );
+    }
+    
+    /**
+     * Esporta tutte le regole in un file CSV (stesso formato del template/import)
+     */
+    private function export_rules_to_csv() {
+        $filename = 'smart-div-injector-export-' . gmdate( 'Y-m-d-H-i-s' ) . '.csv';
+        header( 'Content-Type: text/csv; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+        header( 'Cache-Control: no-cache, no-store, must-revalidate' );
+        header( 'Pragma: no-public' );
+        header( 'Expires: 0' );
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Writing to php://output stream, not filesystem.
+        $out = fopen( 'php://output', 'w' );
+        if ( $out === false ) {
+            return;
+        }
+        fprintf( $out, chr(0xEF) . chr(0xBB) . chr(0xBF) );
+        $headers = [
+            'name',
+            'active',
+            'match_mode',
+            'page_id',
+            'category_id',
+            'selector',
+            'position',
+            'paragraph_number',
+            'device_target',
+            'alignment',
+            'variant_name',
+            'variant_code',
+        ];
+        fputcsv( $out, $headers );
+        $rules = $this->get_rules();
+        foreach ( $rules as $rule_id => $rule ) {
+            $variants = $rule['variants'] ?? [];
+            $active_index = isset( $rule['active_variant'] ) ? (int) $rule['active_variant'] : 0;
+            $variant = isset( $variants[ $active_index ] ) ? $variants[ $active_index ] : ( isset( $variants[0] ) ? $variants[0] : [ 'name' => 'Variante 1', 'code' => '' ] );
+            $variant_name = $variant['name'] ?? 'Variante 1';
+            $variant_code = $variant['code'] ?? '';
+            fputcsv( $out, [
+                $rule['name'] ?? '',
+                ! empty( $rule['active'] ) ? '1' : '0',
+                $rule['match_mode'] ?? 'single_posts',
+                isset( $rule['page_id'] ) ? (int) $rule['page_id'] : 0,
+                isset( $rule['category_id'] ) ? (int) $rule['category_id'] : 0,
+                $rule['selector'] ?? '',
+                $rule['position'] ?? 'append',
+                isset( $rule['paragraph_number'] ) ? (int) $rule['paragraph_number'] : 1,
+                $rule['device_target'] ?? 'both',
+                $rule['alignment'] ?? 'none',
+                $variant_name,
+                $variant_code,
+            ] );
+        }
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- php://output stream.
         fclose( $out );
     }
@@ -710,6 +776,10 @@ class Smart_Div_Injector {
                     <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=download_csv_template' ), 'sdi_download_csv_template', '_wpnonce' ) ); ?>" class="button">
                         <span class="dashicons dashicons-download"></span>
                         Scarica template CSV
+                    </a>
+                    <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=export_csv' ), 'sdi_export_csv', '_wpnonce' ) ); ?>" class="button">
+                        <span class="dashicons dashicons-database-export"></span>
+                        Esporta CSV
                     </a>
                     <form method="post" action="" enctype="multipart/form-data" class="sdi-import-form" style="display:inline;">
                         <?php wp_nonce_field( 'sdi_rule_action', 'sdi_nonce' ); ?>
