@@ -43,6 +43,7 @@ Perfect for:
 ✅ **Script Activation** - Automatically activates injected scripts  
 ✅ **Rule Management** - Add, edit, duplicate, and delete rules with ease  
 ✅ **Import / Export CSV** - Import rules from CSV (supports fields with commas and spaces via standard CSV quoting) and download a template  
+✅ **Export / Import Excel** - Optional: export and import rules as .xlsx (requires `composer install` in plugin folder, PHP 7.4+)  
 ✅ **Enable/Disable Rules** - Activate or deactivate rules without deleting them  
 ✅ **Modern UI/UX** - Beautiful and intuitive admin interface with custom styling  
 ✅ **Responsive Design** - Fully responsive admin panel that works on all devices  
@@ -134,6 +135,8 @@ You can bulk-import rules from a CSV file and download a template with the corre
 
 - **Scarica template CSV** – Downloads a UTF-8 CSV template with header row and one example row. Use it as a starting point; you can add more rows. Fields that contain commas or line breaks must be quoted in the CSV (most spreadsheet apps do this automatically when exporting).
 - **Importa CSV** – Upload a CSV file with the same columns as the template. Each data row becomes one rule. The template columns are: `name`, `active`, `match_mode`, `page_id`, `category_id`, `selector`, `position`, `paragraph_number`, `device_target`, `alignment`, `variant_name`, `variant_code`. Valid values for `match_mode`: `site_wide`, `single_posts`, `category_archive`, `single_posts_category`, `page`. For `position`: `append`, `prepend`, `before`, `after`, `replace`, `before_post`, `before_content`, `after_content`, `before_paragraph`, `after_paragraph`, `before_image`, `after_image`. Use UTF-8 encoding for the file.
+
+**Export/Import Excel (.xlsx):** If PhpSpreadsheet is available (run `composer install` in the plugin folder), you will see **Esporta Excel** and **Importa CSV / Excel**. You can export all rules to a native Excel file (.xlsx) and import from .xlsx as well. The first sheet is used; column layout is the same as the CSV template. Requires PHP 7.4+ for Composer dependencies.
 
 ### Rule Settings
 

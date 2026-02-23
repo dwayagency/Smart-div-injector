@@ -1,0 +1,11 @@
+{
+    "name": "dway/smart-div-injector",
+    "description": "Smart Div Injector - Excel export/import support",
+    "require": {
+        "php": ">=7.4",
+        "phpoffice/phpspreadsheet": "^1.29"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

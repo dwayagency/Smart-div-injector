@@ -16,6 +16,11 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+$sdi_vendor = dirname( __FILE__ ) . '/vendor/autoload.php';
+if ( file_exists( $sdi_vendor ) ) {
+    require_once $sdi_vendor;
+}
+
 class Smart_Div_Injector {
     const OPTION_KEY = 'sdi_rules'; // Cambiato da sdi_options a sdi_rules (array di regole)
 
@@ -79,6 +84,13 @@ class Smart_Div_Injector {
      */
     private function generate_rule_id() {
         return 'rule_' . time() . '_' . wp_rand( 1000, 9999 );
+    }
+    
+    /**
+     * Indica se l'export/import Excel (.xlsx) è disponibile (PhpSpreadsheet caricato)
+     */
+    private function excel_available() {
+        return class_exists( 'PhpOffice\PhpSpreadsheet\Spreadsheet' );
     }
     
     /**
@@ -193,10 +205,22 @@ class Smart_Div_Injector {
             exit;
         }
         
-        // Importa CSV (file validated by is_uploaded_file in import_rules_from_csv).
+        // Esporta Excel (.xlsx) - richiede PhpSpreadsheet (composer install)
+        if ( isset( $_GET['action'] ) && $_GET['action'] === 'export_excel' ) {
+            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'sdi_export_excel' ) ) {
+                wp_die( 'Nonce verification failed' );
+            }
+            if ( ! $this->excel_available() ) {
+                wp_die( esc_html__( 'Export Excel non disponibile: esegui "composer install" nella cartella del plugin.', 'smart-div-injector' ) );
+            }
+            $this->export_rules_to_excel();
+            exit;
+        }
+        
+        // Importa CSV o Excel (file validated in import handler)
         if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'import_csv' && ! empty( $_FILES['sdi_csv_file']['tmp_name'] ) ) {
-            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Validated via is_uploaded_file() in import_rules_from_csv().
-            $result = $this->import_rules_from_csv( $_FILES['sdi_csv_file'] );
+            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Validated via is_uploaded_file in import handler.
+            $result = $this->import_rules_from_upload( $_FILES['sdi_csv_file'] );
             if ( isset( $result['imported'] ) && $result['imported'] > 0 ) {
                 $msg = $result['imported'] === 1 ? 'imported_one' : 'imported_many';
                 wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=' . $msg . '&count=' . $result['imported'] ) );
@@ -348,6 +372,87 @@ class Smart_Div_Injector {
     }
     
     /**
+     * Esporta tutte le regole in un file Excel (.xlsx) - richiede PhpSpreadsheet
+     */
+    private function export_rules_to_excel() {
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle( __( 'Regole', 'smart-div-injector' ) );
+        $headers = [
+            'name', 'active', 'match_mode', 'page_id', 'page_title', 'category_id', 'category_name',
+            'selector', 'position', 'paragraph_number', 'device_target', 'alignment', 'variant_name', 'variant_code',
+        ];
+        $col = 'A';
+        foreach ( $headers as $h ) {
+            $sheet->setCellValue( $col . '1', $h );
+            $col++;
+        }
+        $rules = $this->get_rules();
+        $row = 2;
+        foreach ( $rules as $rule_id => $rule ) {
+            $variant_name = 'Variante 1';
+            $variant_code = '';
+            if ( isset( $rule['code'] ) && ! isset( $rule['variants'] ) ) {
+                $variant_code = $rule['code'];
+            } else {
+                $variants   = $rule['variants'] ?? [];
+                $active_idx = isset( $rule['active_variant'] ) ? (int) $rule['active_variant'] : 0;
+                if ( ! empty( $variants ) && isset( $variants[ $active_idx ] ) ) {
+                    $variant_name = $variants[ $active_idx ]['name'] ?? 'Variante 1';
+                    $variant_code = $variants[ $active_idx ]['code'] ?? '';
+                } elseif ( ! empty( $variants ) && isset( $variants[0] ) ) {
+                    $variant_name = $variants[0]['name'] ?? 'Variante 1';
+                    $variant_code = $variants[0]['code'] ?? '';
+                }
+            }
+            $page_id = isset( $rule['page_id'] ) ? (int) $rule['page_id'] : 0;
+            $category_id = isset( $rule['category_id'] ) ? (int) $rule['category_id'] : 0;
+            $page_title = '';
+            $category_name = '';
+            if ( $page_id > 0 && ( $rule['match_mode'] ?? '' ) === 'page' ) {
+                $page_title = get_the_title( $page_id );
+                if ( $page_title === '' ) {
+                    $page_title = '(ID: ' . $page_id . ')';
+                }
+            }
+            if ( $category_id > 0 && in_array( $rule['match_mode'] ?? '', [ 'category_archive', 'single_posts_category' ], true ) ) {
+                $cat = get_category( $category_id );
+                $category_name = $cat && ! is_wp_error( $cat ) ? $cat->name : '(ID: ' . $category_id . ')';
+            }
+            $values = [
+                $rule['name'] ?? '',
+                ! empty( $rule['active'] ) ? '1' : '0',
+                $rule['match_mode'] ?? 'single_posts',
+                $page_id,
+                $page_title,
+                $category_id,
+                $category_name,
+                $rule['selector'] ?? '',
+                $rule['position'] ?? 'append',
+                isset( $rule['paragraph_number'] ) ? (int) $rule['paragraph_number'] : 1,
+                $rule['device_target'] ?? 'both',
+                $rule['alignment'] ?? 'none',
+                $variant_name,
+                $variant_code,
+            ];
+            $col = 'A';
+            foreach ( $values as $val ) {
+                $sheet->setCellValue( $col . $row, $val );
+                $col++;
+            }
+            $row++;
+        }
+        $filename = 'smart-div-injector-export-' . gmdate( 'Y-m-d-H-i-s' ) . '.xlsx';
+        header( 'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' );
+        header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+        header( 'Cache-Control: no-cache, no-store, must-revalidate' );
+        header( 'Pragma: no-public' );
+        header( 'Expires: 0' );
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx( $spreadsheet );
+        $writer->save( 'php://output' );
+    }
+    
+    /**
      * Importa regole da file CSV (supporta campi con virgole e spazi tramite quoting CSV)
      */
     private function import_rules_from_csv( $file ) {
@@ -378,9 +483,67 @@ class Smart_Div_Injector {
             return [ 'imported' => 0, 'errors' => $errors ];
         }
         $header = array_map( 'trim', $header );
+        $rows = [];
+        while ( ( $row = fgetcsv( $handle ) ) !== false ) {
+            $rows[] = $row;
+        }
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Uploaded temp file.
+        fclose( $handle );
+        return $this->import_rules_from_rows( $header, $rows );
+    }
+    
+    /**
+     * Importa da upload: rileva CSV o XLSX e delega al parser appropriato
+     */
+    private function import_rules_from_upload( $file ) {
+        $name = isset( $file['name'] ) ? $file['name'] : '';
+        $ext  = strtolower( pathinfo( $name, PATHINFO_EXTENSION ) );
+        if ( $ext === 'xlsx' && $this->excel_available() ) {
+            return $this->import_rules_from_xlsx( $file );
+        }
+        return $this->import_rules_from_csv( $file );
+    }
+    
+    /**
+     * Importa regole da file Excel (.xlsx) - richiede PhpSpreadsheet
+     */
+    private function import_rules_from_xlsx( $file ) {
+        $errors = [];
+        $tmp = isset( $file['tmp_name'] ) ? $file['tmp_name'] : '';
+        if ( ! $tmp || ! is_uploaded_file( $tmp ) ) {
+            $errors[] = __( 'File non valido o non caricato.', 'smart-div-injector' );
+            return [ 'imported' => 0, 'errors' => $errors ];
+        }
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load( $tmp );
+            $sheet       = $spreadsheet->getActiveSheet();
+            $rows        = $sheet->toArray( '', true, true, true );
+            $rows        = array_values( $rows );
+            if ( empty( $rows ) ) {
+                $errors[] = __( 'Il file Excel è vuoto o non valido.', 'smart-div-injector' );
+                return [ 'imported' => 0, 'errors' => $errors ];
+            }
+            $header = array_map( 'trim', array_values( $rows[0] ) );
+            $data_rows = [];
+            for ( $i = 1; $i < count( $rows ); $i++ ) {
+                $data_rows[] = array_values( $rows[ $i ] );
+            }
+            return $this->import_rules_from_rows( $header, $data_rows );
+        } catch ( \Exception $e ) {
+            $errors[] = __( 'Errore lettura Excel:', 'smart-div-injector' ) . ' ' . $e->getMessage();
+            return [ 'imported' => 0, 'errors' => $errors ];
+        }
+    }
+    
+    /**
+     * Importa regole a partire da intestazione e righe (usato da CSV e Excel)
+     */
+    private function import_rules_from_rows( $header, $rows ) {
+        $errors = [];
+        $imported = 0;
         $rules = $this->get_rules();
         $row_num = 1;
-        while ( ( $row = fgetcsv( $handle ) ) !== false ) {
+        foreach ( $rows as $row ) {
             $row_num++;
             if ( count( $row ) < 2 ) {
                 continue;
@@ -412,8 +575,6 @@ class Smart_Div_Injector {
             $rules[ $rule_id ] = $rule;
             $imported++;
         }
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Uploaded temp file.
-        fclose( $handle );
         if ( $imported > 0 ) {
             $this->save_rules( $rules );
         }
@@ -811,14 +972,20 @@ class Smart_Div_Injector {
                         <span class="dashicons dashicons-database-export"></span>
                         Esporta CSV
                     </a>
+                    <?php if ( $this->excel_available() ) : ?>
+                    <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=smart-div-injector&action=export_excel' ), 'sdi_export_excel', '_wpnonce' ) ); ?>" class="button">
+                        <span class="dashicons dashicons-media-spreadsheet"></span>
+                        Esporta Excel
+                    </a>
+                    <?php endif; ?>
                     <form method="post" action="" enctype="multipart/form-data" class="sdi-import-form" style="display:inline;">
                         <?php wp_nonce_field( 'sdi_rule_action', 'sdi_nonce' ); ?>
                         <input type="hidden" name="sdi_action" value="import_csv">
                         <label for="sdi-csv-file" class="button">
                             <span class="dashicons dashicons-upload"></span>
-                            Importa CSV
+                            Importa CSV<?php echo $this->excel_available() ? ' / Excel' : ''; ?>
                         </label>
-                        <input type="file" id="sdi-csv-file" name="sdi_csv_file" accept=".csv" style="display:none;" required>
+                        <input type="file" id="sdi-csv-file" name="sdi_csv_file" accept=".csv,.xlsx" style="display:none;" required>
                         <script>
                         (function(){
                             var f = document.getElementById('sdi-csv-file');
