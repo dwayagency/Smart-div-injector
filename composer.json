@@ -3,9 +3,12 @@
     "description": "Smart Div Injector - Excel export/import support",
     "require": {
         "php": ">=7.4",
-        "phpoffice/phpspreadsheet": "^1.29"
+        "phpoffice/phpspreadsheet": "~1.29.0"
     },
     "config": {
-        "optimize-autoloader": true
+        "optimize-autoloader": true,
+        "platform": {
+            "php": "8.0.30"
+        }
     }
 }
