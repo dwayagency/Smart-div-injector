@@ -1207,6 +1207,7 @@ class Smart_Div_Injector {
                                 <span class="sdi-bulk-count" style="margin-left: 10px; color: #646970;"></span>
                             </div>
                         </div>
+                    </form>
                     <table class="wp-list-table widefat fixed striped sdi-rules-table">
                         <thead>
                             <tr>
@@ -1227,7 +1228,7 @@ class Smart_Div_Injector {
                             <?php foreach ( $rules as $rule_id => $rule ) : ?>
                                 <tr>
                                     <th scope="row" class="check-column">
-                                        <input type="checkbox" name="rule_ids[]" value="<?php echo esc_attr( $rule_id ); ?>" class="sdi-rule-checkbox">
+                                        <input type="checkbox" form="sdi-bulk-form" name="rule_ids[]" value="<?php echo esc_attr( $rule_id ); ?>" class="sdi-rule-checkbox">
                                     </th>
                                     <td>
                                         <span class="sdi-status-badge <?php echo $rule['active'] ? 'active' : 'inactive'; ?>">
@@ -1439,7 +1440,6 @@ class Smart_Div_Injector {
                             <?php endforeach; ?>
                         </tbody>
                     </table>
-                    </form>
                     
                     <!-- Paginazione -->
                     <?php if ( $total_pages > 1 ) : ?>
@@ -1479,10 +1479,10 @@ class Smart_Div_Injector {
             var bulkForm = document.getElementById('sdi-bulk-form');
             if (bulkForm) {
                 var selectAll = document.getElementById('sdi-select-all');
-                var checkboxes = bulkForm.querySelectorAll('.sdi-rule-checkbox');
+                var checkboxes = document.querySelectorAll('.sdi-rule-checkbox');
                 var countSpan = bulkForm.querySelector('.sdi-bulk-count');
                 function updateCount() {
-                    var n = bulkForm.querySelectorAll('.sdi-rule-checkbox:checked').length;
+                    var n = document.querySelectorAll('.sdi-rule-checkbox:checked').length;
                     countSpan.textContent = n > 0 ? n + ' selezionate' : '';
                     selectAll.checked = n > 0 && n === checkboxes.length;
                     selectAll.indeterminate = n > 0 && n < checkboxes.length;
