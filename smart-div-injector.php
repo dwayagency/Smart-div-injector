@@ -168,6 +168,21 @@ class Smart_Div_Injector {
             exit;
         }
         
+        // Eliminazione massiva (bulk delete)
+        if ( isset( $_POST['sdi_action'] ) && $_POST['sdi_action'] === 'bulk_delete' && ! empty( $_POST['rule_ids'] ) && is_array( $_POST['rule_ids'] ) ) {
+            $ids = array_map( 'sanitize_text_field', array_map( 'wp_unslash', $_POST['rule_ids'] ) );
+            $count = 0;
+            foreach ( $ids as $rule_id ) {
+                if ( $rule_id !== '' ) {
+                    $this->delete_rule( $rule_id );
+                    $count++;
+                }
+            }
+            $msg = $count === 1 ? 'deleted' : 'bulk_deleted';
+            wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector&message=' . $msg . '&count=' . $count ) );
+            exit;
+        }
+        
         // Duplica regola
         if ( isset( $_GET['action'] ) && $_GET['action'] === 'duplicate' && isset( $_GET['rule_id'] ) ) {
             $rule_id = sanitize_text_field( wp_unslash( $_GET['rule_id'] ) );
@@ -1024,6 +1039,10 @@ class Smart_Div_Injector {
                 <div class="sdi-notice success">
                     <p><strong>✓ Regola eliminata con successo!</strong></p>
                 </div>
+            <?php elseif ( $message === 'bulk_deleted' ) : ?>
+                <div class="sdi-notice success">
+                    <p><strong>✓ <?php echo esc_html( isset( $_GET['count'] ) ? absint( wp_unslash( $_GET['count'] ) ) : 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display only. ?> regole eliminate con successo.</strong></p>
+                </div>
             <?php elseif ( $message === 'duplicated' ) : ?>
                 <div class="sdi-notice success">
                     <p><strong>✓ Regola duplicata con successo!</strong></p>
@@ -1176,9 +1195,24 @@ class Smart_Div_Injector {
                         </a>
                     </div>
                 <?php else : ?>
+                    <form method="post" action="" id="sdi-bulk-form">
+                        <?php wp_nonce_field( 'sdi_rule_action', 'sdi_nonce' ); ?>
+                        <input type="hidden" name="sdi_action" value="bulk_delete">
+                        <div class="tablenav top" style="margin-bottom: 10px;">
+                            <div class="sdi-bulk-actions alignleft actions">
+                                <button type="submit" name="sdi_bulk_delete" class="button" id="sdi-bulk-delete-btn" onclick="return confirm('Eliminare le regole selezionate?');">
+                                    <span class="dashicons dashicons-trash" style="vertical-align: middle;"></span>
+                                    Elimina selezionate
+                                </button>
+                                <span class="sdi-bulk-count" style="margin-left: 10px; color: #646970;"></span>
+                            </div>
+                        </div>
                     <table class="wp-list-table widefat fixed striped sdi-rules-table">
                         <thead>
                             <tr>
+                                <td class="check-column" style="width: 2.2em;">
+                                    <input type="checkbox" id="sdi-select-all" title="Seleziona tutte">
+                                </td>
                                 <th scope="col" style="width: 100px;">Stato</th>
                                 <th scope="col">Nome Regola</th>
                                 <th scope="col">Tipo</th>
@@ -1192,6 +1226,9 @@ class Smart_Div_Injector {
                         <tbody>
                             <?php foreach ( $rules as $rule_id => $rule ) : ?>
                                 <tr>
+                                    <th scope="row" class="check-column">
+                                        <input type="checkbox" name="rule_ids[]" value="<?php echo esc_attr( $rule_id ); ?>" class="sdi-rule-checkbox">
+                                    </th>
                                     <td>
                                         <span class="sdi-status-badge <?php echo $rule['active'] ? 'active' : 'inactive'; ?>">
                                             <span class="dashicons dashicons-<?php echo $rule['active'] ? 'yes-alt' : 'dismiss'; ?>"></span>
@@ -1311,7 +1348,7 @@ class Smart_Div_Injector {
                                 
                                 <!-- Riga Quick Edit -->
                                 <tr id="quick-edit-<?php echo esc_attr( $rule_id ); ?>" class="sdi-quick-edit-row" style="display: none;">
-                                    <td colspan="8">
+                                    <td colspan="9">
                                         <form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector' ) ); ?>" class="sdi-quick-edit-form">
                                             <?php wp_nonce_field( 'sdi_rule_action', 'sdi_nonce' ); ?>
                                             <input type="hidden" name="sdi_action" value="quick_edit">
@@ -1402,6 +1439,7 @@ class Smart_Div_Injector {
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                    </form>
                     
                     <!-- Paginazione -->
                     <?php if ( $total_pages > 1 ) : ?>
@@ -1436,6 +1474,32 @@ class Smart_Div_Injector {
         <script>
         (function() {
             'use strict';
+            
+            // ========== SELEZIONE MASSIVA ==========
+            var bulkForm = document.getElementById('sdi-bulk-form');
+            if (bulkForm) {
+                var selectAll = document.getElementById('sdi-select-all');
+                var checkboxes = bulkForm.querySelectorAll('.sdi-rule-checkbox');
+                var countSpan = bulkForm.querySelector('.sdi-bulk-count');
+                function updateCount() {
+                    var n = bulkForm.querySelectorAll('.sdi-rule-checkbox:checked').length;
+                    countSpan.textContent = n > 0 ? n + ' selezionate' : '';
+                    selectAll.checked = n > 0 && n === checkboxes.length;
+                    selectAll.indeterminate = n > 0 && n < checkboxes.length;
+                    var btn = document.getElementById('sdi-bulk-delete-btn');
+                    if (btn) btn.disabled = n === 0;
+                }
+                if (selectAll) {
+                    selectAll.addEventListener('change', function() {
+                        checkboxes.forEach(function(cb) { cb.checked = selectAll.checked; });
+                        updateCount();
+                    });
+                }
+                checkboxes.forEach(function(cb) {
+                    cb.addEventListener('change', updateCount);
+                });
+                updateCount();
+            }
             
             // ========== QUICK EDIT ==========
             window.sdiShowQuickEdit = function(ruleId) {
