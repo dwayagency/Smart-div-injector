@@ -23,12 +23,17 @@ if ( file_exists( $sdi_vendor ) ) {
 
 class Smart_Div_Injector {
     const OPTION_KEY = 'sdi_rules'; // Cambiato da sdi_options a sdi_rules (array di regole)
+    const STATS_OPTION_KEY = 'sdi_banner_stats';
 
     public function __construct() {
         // Admin
         add_action( 'admin_menu', [ $this, 'add_settings_page' ] );
         add_action( 'admin_init', [ $this, 'handle_actions' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
+        add_action( 'wp_ajax_sdi_track_impression', [ $this, 'ajax_track_impression' ] );
+        add_action( 'wp_ajax_nopriv_sdi_track_impression', [ $this, 'ajax_track_impression' ] );
+        add_action( 'wp_ajax_sdi_track_click', [ $this, 'ajax_track_click' ] );
+        add_action( 'wp_ajax_nopriv_sdi_track_click', [ $this, 'ajax_track_click' ] );
 
         // Multisite: aggiungi menu anche nel Network Admin (opzionale)
         if ( is_multisite() ) {
@@ -69,6 +74,76 @@ class Smart_Div_Injector {
      */
     public function save_rules( $rules ) {
         update_option( self::OPTION_KEY, $rules );
+    }
+    
+    /**
+     * Ottieni le statistiche banner (impression, click per rule_id)
+     */
+    public function get_banner_stats() {
+        $stats = get_option( self::STATS_OPTION_KEY, [] );
+        return is_array( $stats ) ? $stats : [];
+    }
+    
+    /**
+     * Incrementa impression per una regola
+     */
+    private function increment_impression( $rule_id ) {
+        $stats = $this->get_banner_stats();
+        if ( ! isset( $stats[ $rule_id ] ) ) {
+            $stats[ $rule_id ] = [ 'impressions' => 0, 'clicks' => 0 ];
+        }
+        $stats[ $rule_id ]['impressions'] = (int) $stats[ $rule_id ]['impressions'] + 1;
+        update_option( self::STATS_OPTION_KEY, $stats );
+    }
+    
+    /**
+     * Incrementa click per una regola
+     */
+    private function increment_click( $rule_id ) {
+        $stats = $this->get_banner_stats();
+        if ( ! isset( $stats[ $rule_id ] ) ) {
+            $stats[ $rule_id ] = [ 'impressions' => 0, 'clicks' => 0 ];
+        }
+        $stats[ $rule_id ]['clicks'] = (int) $stats[ $rule_id ]['clicks'] + 1;
+        update_option( self::STATS_OPTION_KEY, $stats );
+    }
+    
+    /**
+     * AJAX: registra una impression (banner visto)
+     */
+    public function ajax_track_impression() {
+        if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'sdi_track' ) ) {
+            wp_send_json_error( [ 'code' => 'invalid_nonce' ], 400 );
+        }
+        $rule_id = isset( $_POST['rule_id'] ) ? sanitize_text_field( wp_unslash( $_POST['rule_id'] ) ) : '';
+        if ( $rule_id === '' ) {
+            wp_send_json_error( [ 'code' => 'missing_rule_id' ], 400 );
+        }
+        $rules = $this->get_rules();
+        if ( ! isset( $rules[ $rule_id ] ) || empty( $rules[ $rule_id ]['track_stats'] ) ) {
+            wp_send_json_error( [ 'code' => 'invalid_rule' ], 400 );
+        }
+        $this->increment_impression( $rule_id );
+        wp_send_json_success();
+    }
+    
+    /**
+     * AJAX: registra un click sul banner
+     */
+    public function ajax_track_click() {
+        if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'sdi_track' ) ) {
+            wp_send_json_error( [ 'code' => 'invalid_nonce' ], 400 );
+        }
+        $rule_id = isset( $_POST['rule_id'] ) ? sanitize_text_field( wp_unslash( $_POST['rule_id'] ) ) : '';
+        if ( $rule_id === '' ) {
+            wp_send_json_error( [ 'code' => 'missing_rule_id' ], 400 );
+        }
+        $rules = $this->get_rules();
+        if ( ! isset( $rules[ $rule_id ] ) || empty( $rules[ $rule_id ]['track_stats'] ) ) {
+            wp_send_json_error( [ 'code' => 'invalid_rule' ], 400 );
+        }
+        $this->increment_click( $rule_id );
+        wp_send_json_success();
     }
     
     /**
@@ -119,13 +194,40 @@ class Smart_Div_Injector {
             'dashicons-code-standards',        // Icon
             65                                  // Position (after Plugins)
         );
+        add_submenu_page(
+            'smart-div-injector',
+            'Report banner',
+            'Report banner',
+            'manage_options',
+            'smart-div-injector-report',
+            [ $this, 'render_banner_report_page' ]
+        );
     }
     
     /**
      * Gestisce le azioni (aggiungi, modifica, elimina regole)
      */
     public function handle_actions() {
-        if ( ! isset( $_GET['page'] ) || $_GET['page'] !== 'smart-div-injector' ) {
+        $page = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+        
+        // Azzera statistiche report banner
+        if ( $page === 'smart-div-injector-report' && current_user_can( 'manage_options' ) && isset( $_POST['sdi_reset_stats'] ) ) {
+            if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'sdi_reset_banner_stats' ) ) {
+                wp_die( 'Nonce verification failed' );
+            }
+            $rule_id = isset( $_POST['rule_id'] ) ? sanitize_text_field( wp_unslash( $_POST['rule_id'] ) ) : '';
+            $stats = $this->get_banner_stats();
+            if ( $rule_id !== '' ) {
+                unset( $stats[ $rule_id ] );
+            } else {
+                $stats = [];
+            }
+            update_option( self::STATS_OPTION_KEY, $stats );
+            wp_safe_redirect( admin_url( 'admin.php?page=smart-div-injector-report&message=stats_reset' ) );
+            exit;
+        }
+        
+        if ( $page !== 'smart-div-injector' ) {
             return;
         }
         
@@ -634,6 +736,11 @@ class Smart_Div_Injector {
             unset( $rules[ $rule_id ] );
             $this->save_rules( $rules );
         }
+        $stats = $this->get_banner_stats();
+        if ( isset( $stats[ $rule_id ] ) ) {
+            unset( $stats[ $rule_id ] );
+            update_option( self::STATS_OPTION_KEY, $stats );
+        }
     }
     
     /**
@@ -732,6 +839,7 @@ class Smart_Div_Injector {
             'device_target'     => in_array( $data['device_target'] ?? 'both', $valid_devices, true ) ? ( $data['device_target'] ) : 'both',
             'alignment'         => in_array( $data['alignment'] ?? 'none', $valid_alignments, true ) ? ( $data['alignment'] ) : 'none',
             'active_variant'    => isset( $data['active_variant'] ) ? absint( $data['active_variant'] ) : 0,
+            'track_stats'       => isset( $data['track_stats'] ) && $data['track_stats'] === '1',
         ];
         
         // Sanitizza le varianti
@@ -902,6 +1010,80 @@ class Smart_Div_Injector {
         } else {
             $this->render_rules_list_page();
         }
+    }
+    
+    /**
+     * Render della pagina Report banner (impression, click, CTR)
+     */
+    public function render_banner_report_page() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        $rules = $this->get_rules();
+        $stats = $this->get_banner_stats();
+        $message = isset( $_GET['message'] ) ? sanitize_text_field( wp_unslash( $_GET['message'] ) ) : '';
+        
+        $rows = [];
+        foreach ( $rules as $rule_id => $rule ) {
+            $s = isset( $stats[ $rule_id ] ) ? $stats[ $rule_id ] : [ 'impressions' => 0, 'clicks' => 0 ];
+            $imp = (int) ( $s['impressions'] ?? 0 );
+            $clk = (int) ( $s['clicks'] ?? 0 );
+            $ctr = $imp > 0 ? ( $clk / $imp * 100 ) : 0;
+            $rows[] = [
+                'rule_id'     => $rule_id,
+                'name'        => $rule['name'] ?? ( 'Regola ' . $rule_id ),
+                'impressions' => $imp,
+                'clicks'      => $clk,
+                'ctr'         => $ctr,
+            ];
+        }
+        ?>
+        <div class="wrap">
+            <h1>Report banner</h1>
+            <?php if ( $message === 'stats_reset' ) : ?>
+                <div class="notice notice-success is-dismissible"><p>Statistiche azzerate.</p></div>
+            <?php endif; ?>
+            <p class="description">Impression = visualizzazioni del banner; Click = click sui link. Per raccogliere i dati attiva "Traccia impression e click" in ciascuna regola.</p>
+            <?php if ( empty( $rows ) ) : ?>
+                <p>Nessuna regola presente. Crea una regola dalla lista Smart Div Injector.</p>
+            <?php else : ?>
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector-report' ) ); ?>" style="margin-bottom: 12px;">
+                    <?php wp_nonce_field( 'sdi_reset_banner_stats', '_wpnonce' ); ?>
+                    <input type="hidden" name="sdi_reset_stats" value="1">
+                    <button type="submit" class="button button-secondary">Azzera tutte le statistiche</button>
+                </form>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th scope="col">Nome regola</th>
+                            <th scope="col" style="width: 120px;">Impression</th>
+                            <th scope="col" style="width: 100px;">Click</th>
+                            <th scope="col" style="width: 100px;">CTR %</th>
+                            <th scope="col" style="width: 120px;">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ( $rows as $row ) : ?>
+                            <tr>
+                                <td><strong><?php echo esc_html( $row['name'] ); ?></strong></td>
+                                <td><?php echo esc_html( (string) $row['impressions'] ); ?></td>
+                                <td><?php echo esc_html( (string) $row['clicks'] ); ?></td>
+                                <td><?php echo esc_html( number_format( $row['ctr'], 2 ) ); ?>%</td>
+                                <td>
+                                    <form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=smart-div-injector-report' ) ); ?>" style="display:inline;">
+                                        <?php wp_nonce_field( 'sdi_reset_banner_stats', '_wpnonce' ); ?>
+                                        <input type="hidden" name="sdi_reset_stats" value="1">
+                                        <input type="hidden" name="rule_id" value="<?php echo esc_attr( $row['rule_id'] ); ?>">
+                                        <button type="submit" class="button button-small">Azzera</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </div>
+        <?php
     }
     
     /**
@@ -1570,6 +1752,7 @@ class Smart_Div_Injector {
             'device_target'    => 'both',
             'alignment'        => 'none',
             'active_variant'   => 0,
+            'track_stats'      => false,
             'variants'         => [
                 [
                     'name' => 'Variante 1',
@@ -1700,6 +1883,17 @@ class Smart_Div_Injector {
                                 <option value="center" <?php selected( $rule['alignment'] ?? 'none', 'center' ); ?>>↔️ Centrato</option>
                             </select>
                             <p class="description">Scegli come posizionare il contenuto iniettato. Float permette al testo di fluire intorno al contenuto.</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row"><label for="track_stats">Reportistica banner</label></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="track_stats" id="track_stats" value="1" <?php checked( ! empty( $rule['track_stats'] ), true ); ?>>
+                                Traccia impression e click per reportistica banner
+                            </label>
+                            <p class="description">Abilita il conteggio delle visualizzazioni (impression) e dei click sui link all'interno del codice iniettato. Usa la pagina "Report banner" per vedere le statistiche.</p>
                         </td>
                     </tr>
                     
@@ -2271,6 +2465,7 @@ class Smart_Div_Injector {
         
         // Array per raccogliere tutti i payload da iniettare via JS
         $payloads = [];
+        $has_track_stats = false;
         
         // Itera su ogni regola
         foreach ( $rules as $rule_id => $rule ) {
@@ -2331,8 +2526,11 @@ class Smart_Div_Injector {
                 
                 // Le posizioni specifiche articoli usano filtri WordPress
                 if ( in_array( $position, $article_positions, true ) ) {
-                    add_filter( 'the_content', function( $content ) use ( $rule ) {
-                        return $this->inject_in_content( $content, $rule );
+                    if ( ! empty( $rule['track_stats'] ) ) {
+                        $has_track_stats = true;
+                    }
+                    add_filter( 'the_content', function( $content ) use ( $rule, $rule_id ) {
+                        return $this->inject_in_content( $content, $rule, $rule_id );
                     }, 10 );
                 } else {
                     // Le posizioni standard usano JavaScript
@@ -2362,7 +2560,9 @@ class Smart_Div_Injector {
                         $variant_code, 
                         $rule['alignment'] ?? 'none' 
                     );
-                    
+                    if ( ! empty( $rule['track_stats'] ) ) {
+                        $aligned_code = '<div data-sdi-rule-id="' . esc_attr( $rule_id ) . '" data-sdi-track="1">' . $aligned_code . '</div>';
+                    }
                     $payload = [
                         'selector' => $rule['selector'],
                         'position' => $rule['position'],
@@ -2382,6 +2582,9 @@ class Smart_Div_Injector {
                     // Verifica che il payload sia ancora valido dopo il filtro
                     if ( ! empty( $payload['selector'] ) && ! empty( $payload['code'] ) ) {
                         $payloads[] = $payload;
+                        if ( ! empty( $rule['track_stats'] ) ) {
+                            $has_track_stats = true;
+                        }
                     }
                 }
             }
@@ -2405,12 +2608,25 @@ class Smart_Div_Injector {
             wp_localize_script( 'sdi-runtime', 'sdiPayloads', $encoded_payloads );
             wp_add_inline_script( 'sdi-runtime', $this->get_inline_js() );
         }
+        
+        // Tracking banner: se almeno una regola ha track_stats, carica script e dati
+        if ( $has_track_stats ) {
+            if ( empty( $payloads ) ) {
+                wp_register_script( 'sdi-runtime', false, [], '2.5.2', true );
+                wp_enqueue_script( 'sdi-runtime' );
+            }
+            wp_localize_script( 'sdi-runtime', 'sdiTrackAjax', [
+                'url'   => admin_url( 'admin-ajax.php' ),
+                'nonce' => wp_create_nonce( 'sdi_track' ),
+            ] );
+            wp_add_inline_script( 'sdi-runtime', $this->get_tracking_js() );
+        }
     }
     
     /**
      * Inietta il codice nel contenuto dell'articolo
      */
-    private function inject_in_content( $content, $rule ) {
+    private function inject_in_content( $content, $rule, $rule_id = null ) {
         // Ottieni il codice della variante attiva
         $variant_code = $this->get_active_variant_code( $rule );
         
@@ -2424,6 +2640,9 @@ class Smart_Div_Injector {
             $variant_code, 
             $rule['alignment'] ?? 'none' 
         );
+        if ( ! empty( $rule['track_stats'] ) && $rule_id !== null && $rule_id !== '' ) {
+            $code = '<div data-sdi-rule-id="' . esc_attr( $rule_id ) . '" data-sdi-track="1">' . $code . '</div>';
+        }
         
         $position = $rule['position'];
         $paragraph_number = isset( $rule['paragraph_number'] ) ? absint( $rule['paragraph_number'] ) : 1;
@@ -2741,6 +2960,78 @@ class Smart_Div_Injector {
 })();
 JS;
         
+        return $js;
+    }
+    
+    /**
+     * Restituisce lo script JS per il tracking impression/click sui banner
+     */
+    private function get_tracking_js(): string {
+        $js = <<<'JS'
+(function(){
+  if (typeof window.sdiTrackAjax === 'undefined' || !window.sdiTrackAjax.url) return;
+  var url = window.sdiTrackAjax.url;
+  var nonce = window.sdiTrackAjax.nonce || '';
+  
+  function sendBeacon(endpoint, data) {
+    var body = new FormData();
+    body.append('action', endpoint);
+    body.append('nonce', nonce);
+    body.append('rule_id', data.rule_id);
+    if (navigator.sendBeacon) {
+      var qs = 'action=' + encodeURIComponent(endpoint) + '&nonce=' + encodeURIComponent(nonce) + '&rule_id=' + encodeURIComponent(data.rule_id);
+      navigator.sendBeacon(url + '?' + qs, '');
+    } else {
+      fetch(url, { method: 'POST', body: body, credentials: 'same-origin' }).catch(function(){});
+    }
+  }
+  
+  function findRuleId(el) {
+    var node = el;
+    while (node && node !== document.body) {
+      if (node.getAttribute && node.getAttribute('data-sdi-track') && node.getAttribute('data-sdi-rule-id')) {
+        return node.getAttribute('data-sdi-rule-id');
+      }
+      node = node.parentNode;
+    }
+    return null;
+  }
+  
+  document.addEventListener('click', function(ev) {
+    var ruleId = findRuleId(ev.target);
+    if (!ruleId) return;
+    var a = ev.target.closest && ev.target.closest('a[href]');
+    if (!a) return;
+    sendBeacon('sdi_track_click', { rule_id: ruleId });
+  }, true);
+  
+  var observed = new Set();
+  var observer = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (!entry.isIntersecting) return;
+      var el = entry.target;
+      if (observed.has(el)) return;
+      observed.add(el);
+      var ruleId = el.getAttribute && el.getAttribute('data-sdi-rule-id');
+      if (ruleId) sendBeacon('sdi_track_impression', { rule_id: ruleId });
+    });
+  }, { rootMargin: '0px', threshold: 0.1 }) : null;
+  
+  function observeTrackElements() {
+    var nodes = document.querySelectorAll('[data-sdi-track][data-sdi-rule-id]');
+    if (observer) {
+      nodes.forEach(function(n) { observer.observe(n); });
+    }
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', observeTrackElements);
+  } else {
+    observeTrackElements();
+  }
+  setTimeout(observeTrackElements, 1500);
+})();
+JS;
         return $js;
     }
 }
